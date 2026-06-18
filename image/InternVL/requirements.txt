@@ -1,0 +1,11 @@
+# Core dependencies
+torch
+torchvision
+transformers>=4.37.0,<=4.49.0
+timm
+einops
+sentencepiece
+pillow
+accelerate
+numpy
+tqdm

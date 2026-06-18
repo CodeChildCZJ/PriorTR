@@ -1,0 +1,27 @@
+# Python
+__pycache__
+*.pyc
+*.egg-info
+dist
+
+# Dependencies (cloned separately)
+lmms-eval/
+
+# Evaluation outputs
+eval_results/
+
+# Log
+*.log
+*.log.*
+
+# Editor
+.idea
+.vscode
+*.swp
+
+# OS
+.DS_Store
+
+# Checkpoints / caches
+.cache/
+checkpoints/

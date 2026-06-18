@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+*.so
+
+# Model weights
+*.pt
+*.bin
+*.safetensors
+*.pth
+*.ckpt
+
+# Downloaded model caches (HF blobs have no extension, must ignore by dir)
+cache_dir/
+hub/
+models--*/
+
+# Evaluation output
+eval_results/
+eval_test/
+*.jsonl
+
+# Logs
+*.log
+*.log.*
+
+# Cache
+.cache/
+wandb/
+
+# External dependencies (user clones separately)
+lmms-eval/
+
+# Compressed archives
+*.zip
+*.tar.gz
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
