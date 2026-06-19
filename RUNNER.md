@@ -16,17 +16,20 @@ the launcher just gives it a single, uniform front-end.
 ## Capability matrix
 
 ```
-model     env                 priortr  fastv  sparsevlm  vispruner  baseline
-llava     PriorTRllava           ✓                                     ✓
-internvl  PriorTRinternvl        ✓      ✓                              ✓
-qwen3vl   PriorTRqwen3vl         ✓      ✓        ✓          ✓          ✓
+model     env                 priortr  priortr_2f  fastv  sparsevlm  vispruner  baseline
+llava     PriorTRllava           ✓                                                  ✓
+internvl  PriorTRinternvl        ✓                  ✓                               ✓
+qwen3vl   PriorTRqwen3vl         ✓         ✓        ✓        ✓          ✓           ✓
 ```
 
 Run `python vtr_run.py --list` to print it. Illegal combinations (e.g.
 `--model llava --method fastv`) are rejected with the supported list.
 
-> **PriorTR-2F** and **Video-LLaVA** are intentionally not wired in yet — they
-> are handled separately later.
+`priortr_2f` is the **two-forward variant of PriorTR** (explicit question-free prior
+forward instead of the single-forward causal-mask shortcut); only Qwen3-VL implements it.
+
+> **Video-LLaVA** is a separate subproject (its own non-lmms-eval pipeline) and is
+> intentionally not wired into this launcher yet.
 
 ## Usage
 
@@ -85,7 +88,8 @@ Per-method tunables (run `--describe <model> <method>` for the authoritative lis
 
 | method | `--param` options |
 |---|---|
-| priortr / fastv | `query_aggregation`, `head_aggregation` |
+| priortr / priortr_2f / fastv | `query_aggregation`, `head_aggregation` |
+| priortr_2f | (above; also runs an extra prior forward — `prior_prompt`/`prior_mode` use config defaults, not exposed here) |
 | sparsevlm | `token_merge` (defaults to `True`) |
 | vispruner | `important_ratio` (note: `prune_layer` is forced to 1 internally) |
 | internvl (any) | `max_num` (image tiles) |
@@ -100,7 +104,7 @@ default where it differs from the bare config default (currently just SparseVLM'
 | Flag | Meaning |
 |---|---|
 | `--model` | `llava` \| `internvl` \| `qwen3vl` |
-| `--method` | `priortr` \| `fastv` \| `sparsevlm` \| `vispruner` \| `baseline` (per matrix) |
+| `--method` | `priortr` \| `priortr_2f` \| `fastv` \| `sparsevlm` \| `vispruner` \| `baseline` (per matrix) |
 | `--tasks` | lmms-eval task list, comma-separated |
 | `--keep-tokens` / `--keep-ratio` | token budget (mutually exclusive) |
 | `--prune-layer` | pruning layer (subproject default if unset) |

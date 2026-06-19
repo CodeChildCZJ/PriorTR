@@ -23,7 +23,7 @@ Default *values* are intentionally left to each subproject's own config (single
 source of truth) — the launcher only injects an "intended" default where it
 differs from the bare config default (e.g. SparseVLM token_merge=True).
 
-Note: PriorTR-2F and Video-LLaVA are intentionally not wired in yet.
+Note: Video-LLaVA is a separate subproject and is intentionally not wired in yet.
 """
 
 import argparse
@@ -48,7 +48,7 @@ import sys
 #                     user overrides it (only where intended != bare default)
 #   method_notes    : caveats surfaced by --describe / warnings
 #   needs_pp_parent : export PYTHONPATH=<subproject dir> (package not pip-installed)
-# NOTE: 'priortr_2f' is deliberately absent from every `methods` list for now.
+# NOTE: 'priortr_2f' (two-forward PriorTR) is wired in for qwen3vl only.
 # --------------------------------------------------------------------------- #
 REGISTRY = {
     "llava": {
@@ -108,12 +108,12 @@ REGISTRY = {
         "keys": {"strategy": "vtr_strategy", "keep_tokens": "vtr_keep_tokens",
                  "keep_ratio": "vtr_keep_ratio", "prune_layer": "vtr_prune_layer"},
         "baseline_args": ["vtr_enabled=False"],
-        "methods": ["priortr", "fastv", "sparsevlm", "vispruner", "baseline"],
+        "methods": ["priortr", "priortr_2f", "fastv", "sparsevlm", "vispruner", "baseline"],
         "params": {
-            "query_aggregation": {"key": "vtr_query_aggregation", "methods": ["priortr", "fastv"],
+            "query_aggregation": {"key": "vtr_query_aggregation", "methods": ["priortr", "priortr_2f", "fastv"],
                                   "choices": ["last", "question", "auto"],
                                   "help": "query attention aggregation"},
-            "head_aggregation": {"key": "vtr_head_aggregation", "methods": ["priortr", "fastv"],
+            "head_aggregation": {"key": "vtr_head_aggregation", "methods": ["priortr", "priortr_2f", "fastv"],
                                  "choices": ["mean", "max"],
                                  "help": "aggregation across attention heads"},
             "token_merge": {"key": "vtr_token_merge", "methods": ["sparsevlm"],
@@ -126,15 +126,19 @@ REGISTRY = {
         "method_defaults": {"sparsevlm": {"token_merge": "True"}},
         "method_notes": {
             "vispruner": "prune_layer is forced to 1 internally (pre-LLM pruning); --prune-layer is ignored.",
+            "priortr_2f": "two-forward variant of PriorTR — runs an extra question-free prior forward "
+                          "(~2x forward cost); prior_prompt/prior_mode use config defaults (not exposed here).",
         },
     },
 }
 
 # Methods that exist in some subprojects but are held back from the runner.
-DEFERRED_METHODS = {"priortr_2f"}
+# (Empty: PriorTR-2F is now wired in. Video-LLaVA is a separate subproject, not a
+# method, and is still out of this launcher.)
+DEFERRED_METHODS = set()
 
 REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
-ALL_METHODS = ["priortr", "fastv", "sparsevlm", "vispruner", "baseline"]
+ALL_METHODS = ["priortr", "priortr_2f", "fastv", "sparsevlm", "vispruner", "baseline"]
 ENV_OVERRIDES_FILE = os.path.join(REPO_ROOT, "envs.json")
 
 
@@ -202,7 +206,8 @@ def print_capability_matrix():
         print(row + cells)
     if envs is None:
         print("\n(could not query conda envs — is conda on PATH?)")
-    print("\n(PriorTR-2F is intentionally not included yet — handled separately later.)")
+    print("\n(priortr_2f is the two-forward variant of PriorTR; Video-LLaVA is a separate "
+          "subproject not wired into this launcher.)")
     print("Run `--describe <model> <method>` to see that combo's tunable hyperparameters.")
 
 
