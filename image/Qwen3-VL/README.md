@@ -187,14 +187,13 @@ All VTR parameters are passed via `--model_args` as comma-separated key=value pa
 |---|---|---|---|
 | `vtr_enabled` | bool | `True` | Enable/disable visual token pruning |
 | `vtr_strategy` | str | `priortr` | Pruning strategy: `priortr`, `fastv`, `infovtr`, `sparsevlm`, `vispruner` |
-| `vtr_prune_layer` | int or list | `3` | Layer(s) at which to prune visual tokens |
+| `vtr_prune_layer` | int or list | `3` | Layer(s) at which to prune visual tokens (ignored by VisPruner, which always prunes pre-LLM at layer 1) |
 | `vtr_keep_tokens` | int or list | `None` | Exact number of visual tokens to keep (overrides `vtr_keep_ratio`) |
 | `vtr_keep_ratio` | float or list | `0.1111` | Fraction of visual tokens to keep (used when `vtr_keep_tokens` is not set) |
-| `vtr_query_aggregation` | str | `auto` | How to aggregate query attention: `auto` (per-strategy default), `last` (last token), or `question` (all question tokens). Auto resolves to `question` for priortr/infovtr, `last` for others |
-| `vtr_head_aggregation` | str | `mean` | How to aggregate across attention heads: `mean` or `max` |
-| `vtr_token_merge` | bool | `False` | Enable token merging (used by SparseVLM) |
-| `vtr_merge_clusters` | int or list | `10` | Number of merge clusters |
-| `vtr_important_ratio` | float | `0.5` | Ratio of important tokens for merging |
+| `vtr_query_aggregation` | str | `auto` | (priortr/fastv) How to aggregate query attention: `auto` (per-strategy default), `last` (last token), or `question` (all question tokens). Auto resolves to `question` for priortr/infovtr, `last` for others |
+| `vtr_head_aggregation` | str | `mean` | (priortr/fastv) How to aggregate across attention heads: `mean` or `max` |
+| `vtr_token_merge` | bool | `False` | (SparseVLM) Merge pruned tokens into a few representative tokens instead of dropping them; the cluster count is derived automatically |
+| `vtr_important_ratio` | float | `0.5` | (VisPruner) Fraction of kept tokens chosen by importance; the rest are chosen by diversity |
 
 ## Project Structure
 
