@@ -266,9 +266,10 @@ def build_inner_command(model, spec, method, args, user_params):
         launch = "python -m lmms_eval"
     cuda = f"CUDA_VISIBLE_DEVICES={args.gpus} " if args.gpus else ""
 
+    limit = f" --limit {args.limit}" if args.limit else ""
     run = (f'{cuda}{launch} --model {spec["wrapper"]} '
            f'--model_args "{model_args}" '
-           f'--tasks {args.tasks} --batch_size {args.batch_size} '
+           f'--tasks {args.tasks} --batch_size {args.batch_size}{limit} '
            f'--output_path {shlex.quote(output)}')
 
     parts = [f"cd {shlex.quote(lmms_dir)}"]
@@ -313,6 +314,8 @@ def main():
                    help="accelerate processes for multi-GPU eval throughput (1 = plain python).")
     p.add_argument("--port", type=int, default=29500, help="accelerate main_process_port.")
     p.add_argument("--batch-size", type=int, default=1, dest="batch_size")
+    p.add_argument("--limit", default=None,
+                   help="lmms-eval --limit: cap #samples (int) or fraction (float), e.g. 2 for smoke tests.")
     p.add_argument("--output", default=None, help="Override --output_path.")
     p.add_argument("--extra", default=None,
                    help='Raw extra model_args appended verbatim (unvalidated escape hatch).')

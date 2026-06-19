@@ -110,6 +110,7 @@ default where it differs from the bare config default (currently just SparseVLM'
 | `--num-processes` | `>1` uses `accelerate launch` for multi-GPU eval throughput (speed only, not a hyperparameter) |
 | `--pretrained` | override the HF checkpoint |
 | `--extra` | raw extra `model_args`, appended verbatim (unvalidated escape hatch) |
+| `--limit N` | lmms-eval `--limit`: cap #samples (int) or fraction — handy for smoke tests |
 | `--dry-run` | print the command, don't execute |
 
 ## Prerequisites
