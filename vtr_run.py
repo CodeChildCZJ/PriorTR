@@ -27,6 +27,7 @@ Note: InfoVTR and Video-LLaVA are intentionally not wired in yet.
 """
 
 import argparse
+import json
 import os
 import shlex
 import subprocess
@@ -134,18 +135,73 @@ DEFERRED_METHODS = {"infovtr"}
 
 REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
 ALL_METHODS = ["priortr", "fastv", "sparsevlm", "vispruner", "baseline"]
+ENV_OVERRIDES_FILE = os.path.join(REPO_ROOT, "envs.json")
+
+
+# --------------------------------------------------------------------------- #
+# Environment resolution & preflight.
+#
+# The launcher dispatches into a conda env *by name* (`conda run -n <name>`).
+# Those envs are NOT created here — a user provisions them once per model by
+# following the subproject README. The name the launcher uses is resolved with
+# this precedence so other machines don't have to match our exact names:
+#     --env <NAME>            (per-invocation override; needs --model)
+#   > envs.json[model]        (per-checkout override, never committed)
+#   > REGISTRY[model]["env"]  (the canonical default)
+# Before running for real we verify the resolved env actually exists and, if
+# not, point at the README that explains how to build it.
+# --------------------------------------------------------------------------- #
+def load_env_overrides():
+    """Read optional REPO_ROOT/envs.json: {model: env_name}. Tolerant of absence."""
+    if not os.path.isfile(ENV_OVERRIDES_FILE):
+        return {}
+    try:
+        with open(ENV_OVERRIDES_FILE) as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            raise ValueError("expected a JSON object of model -> env name")
+        return {str(k): str(v) for k, v in data.items()}
+    except (ValueError, OSError) as e:
+        print(f"warning: ignoring {ENV_OVERRIDES_FILE}: {e}", file=sys.stderr)
+        return {}
+
+
+def resolve_env(model, spec, env_flag, overrides):
+    if env_flag:
+        return env_flag
+    if model in overrides:
+        return overrides[model]
+    return spec["env"]
+
+
+def list_conda_envs():
+    """Set of conda env names, or None if conda can't be queried."""
+    try:
+        out = subprocess.run(["conda", "env", "list", "--json"],
+                             capture_output=True, text=True, check=True)
+        data = json.loads(out.stdout)
+    except (FileNotFoundError, subprocess.CalledProcessError, ValueError):
+        return None
+    return {os.path.basename(p) for p in data.get("envs", [])}
 
 
 def print_capability_matrix():
+    overrides = load_env_overrides()
+    envs = list_conda_envs()
     width = max(len(m) for m in REGISTRY) + 2
-    header = "model".ljust(width) + "env".ljust(20) + "  ".join(ALL_METHODS)
+    envcol = max(len(resolve_env(m, s, None, overrides)) for m, s in REGISTRY.items()) + 12
+    header = "model".ljust(width) + "env".ljust(envcol) + "  ".join(ALL_METHODS)
     print(header)
     print("-" * len(header))
     for model, spec in REGISTRY.items():
-        row = model.ljust(width) + spec["env"].ljust(20)
+        envname = resolve_env(model, spec, None, overrides)
+        mark = "" if envs is None else ("  ✓" if envname in envs else "  ✗ missing")
+        row = model.ljust(width) + (envname + mark).ljust(envcol)
         cells = "".join((" ✓ " if m in spec["methods"] else " · ").center(len(m))
                         for m in ALL_METHODS)
         print(row + cells)
+    if envs is None:
+        print("\n(could not query conda envs — is conda on PATH?)")
     print("\n(InfoVTR is intentionally not included yet — handled separately later.)")
     print("Run `--describe <model> <method>` to see that combo's tunable hyperparameters.")
 
@@ -313,6 +369,8 @@ def main():
                    help="Layer at which to prune (subproject default if unset).")
     p.add_argument("--param", action="append", default=[], metavar="NAME=VALUE", dest="params",
                    help="Method-specific hyperparameter (repeatable; validated per method).")
+    p.add_argument("--env", default=None,
+                   help="Override the conda env name for --model (else envs.json, else the default).")
     p.add_argument("--pretrained", default=None, help="Override the HF checkpoint.")
     p.add_argument("--gpus", default=None, help="CUDA_VISIBLE_DEVICES value, e.g. 0 or 0,1,2.")
     p.add_argument("--num-processes", type=int, default=1, dest="num_processes",
@@ -367,10 +425,24 @@ def main():
         print("warning: vispruner forces prune_layer=1 internally; --prune-layer ignored.",
               file=sys.stderr)
 
+    env = resolve_env(args.model, spec, args.env, load_env_overrides())
     inner, lmms_dir = build_inner_command(args.model, spec, args.method, args, user_params)
 
-    print(f"# model={args.model}  method={args.method}  env={spec['env']}")
-    print(f"# conda run -n {spec['env']} bash -lc '{inner}'")
+    print(f"# model={args.model}  method={args.method}  env={env}")
+    print(f"# conda run -n {env} bash -lc '{inner}'")
+
+    # Preflight: the env must exist (we don't create it). Point at the README.
+    readme = os.path.join(spec["subdir"], "README.md")
+    envs = list_conda_envs()
+    if envs is None:
+        print("\nwarning: could not query conda envs (is conda on PATH?); skipping env "
+              "preflight.", file=sys.stderr)
+    elif env not in envs:
+        print(f"\nerror: conda env '{env}' not found. Create it by following {readme} "
+              f"(the env name must match — or set it with --env / envs.json).",
+              file=sys.stderr)
+        if not args.dry_run:
+            return 4
 
     if not os.path.isdir(lmms_dir):
         print(f"\nwarning: {lmms_dir} not found — clone lmms-eval there per the subproject "
@@ -381,7 +453,7 @@ def main():
     if args.dry_run:
         return 0
 
-    cmd = ["conda", "run", "-n", spec["env"], "--no-capture-output", "bash", "-lc", inner]
+    cmd = ["conda", "run", "-n", env, "--no-capture-output", "bash", "-lc", inner]
     return subprocess.call(cmd)
 
 

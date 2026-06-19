@@ -108,10 +108,41 @@ default where it differs from the bare config default (currently just SparseVLM'
 | `--describe MODEL METHOD` | list a combo's tunable hyperparameters and exit |
 | `--gpus` | `CUDA_VISIBLE_DEVICES` value |
 | `--num-processes` | `>1` uses `accelerate launch` for multi-GPU eval throughput (speed only, not a hyperparameter) |
+| `--env` | override the conda env name for `--model` (else `envs.json`, else the default) |
 | `--pretrained` | override the HF checkpoint |
 | `--extra` | raw extra `model_args`, appended verbatim (unvalidated escape hatch) |
 | `--limit N` | lmms-eval `--limit`: cap #samples (int) or fraction — handy for smoke tests |
 | `--dry-run` | print the command, don't execute |
+
+## Environments (how dispatch finds them)
+
+The launcher does **not** create environments — it dispatches into one *by name*
+(`conda run -n <name>`). Each model needs its conda env built **once**, by
+following that subproject's README (`conda create -n PriorTR<model>` → torch →
+pinned `transformers` → `setup.py develop` / `pip install -e .` → clone lmms-eval
+→ register the wrapper). The env name the launcher uses is resolved as:
+
+```
+--env <NAME>            (per-invocation; needs --model)
+  > envs.json[model]    (per-checkout file: {"qwen3vl": "MyEnv"}; git-ignored)
+  > REGISTRY default    (PriorTRllava / PriorTRinternvl / PriorTRqwen3vl)
+```
+
+So another machine whose envs are named differently doesn't have to edit the
+launcher — point `--env`/`envs.json` at the real names. `python vtr_run.py --list`
+marks each env ✓ present / ✗ missing, and before a real run the launcher
+**preflights** the resolved env: if it's absent you get a clear error naming the
+README to follow (instead of a raw `conda run` failure).
+
+### Reproducibility
+
+Each subproject ships a locked `environment.yml` (`conda env export`, captured on
+linux-64 / CUDA 12.8). It pins every transitive version, but is a **record, not a
+one-command rebuild**: `torch` (cu128 index), `transformers` (PyPI pin for
+LLaVA/InternVL, a git commit for Qwen3-VL) and the editable `lmms-eval` are not on
+default channels — install those per the README first; the `.yml` then pins the
+rest. The README remains the authoritative setup; the `.yml` is the exact-version
+companion.
 
 ## Prerequisites
 

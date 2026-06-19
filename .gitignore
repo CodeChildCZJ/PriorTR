@@ -56,3 +56,6 @@ Thumbs.db
 # Jupyter
 .ipynb_checkpoints/
 *.ipynb
+
+# local conda-env name overrides for vtr_run.py (machine-specific)
+envs.json
