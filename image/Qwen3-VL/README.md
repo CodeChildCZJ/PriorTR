@@ -2,7 +2,7 @@
 
 Visual token pruning for Qwen3-VL using **PriorTR** (Prior Token Reduction), a single-forward V-Information method. PriorTR exploits causal attention to extract both a prior distribution (from the newline token after the image) and a task distribution (from the last query token) in a single forward pass, then computes V-Information scores `S = P * log(P / Q)` to identify and retain only the most task-relevant visual tokens.
 
-This repository also includes **FastV**, **InfoVTR**, **SparseVLM**, and **VisPruner** baselines under a unified VTR (Visual Token Reduction) framework.
+This repository also includes **FastV**, **PriorTR-2F**, **SparseVLM**, and **VisPruner** baselines under a unified VTR (Visual Token Reduction) framework.
 
 ## Environment Setup
 
@@ -153,16 +153,19 @@ accelerate launch --num_processes=5 --main_process_port=29500 \
     --output_path ../eval_results/fastv_0.2222_sqa
 ```
 
-### InfoVTR Baseline
+### PriorTR-2F (two-forward PriorTR)
 
-InfoVTR defaults to `query_aggregation=question` via `auto`:
+PriorTR-2F is the **two-forward variant of PriorTR**: identical task attention `P` and
+V-Information score `S = P·log(P/Q)`; the prior `Q` is computed from an explicit
+question-free second forward instead of PriorTR's single-forward causal-mask shortcut.
+It defaults to `query_aggregation=question` via `auto`:
 
 ```bash
 accelerate launch --num_processes=5 --main_process_port=29500 \
     -m lmms_eval --model qwen3_vl_vtr \
-    --model_args "pretrained=Qwen/Qwen3-VL-8B-Instruct,attn_implementation=sdpa,vtr_strategy=infovtr,vtr_keep_ratio=0.2222,vtr_prune_layer=3" \
+    --model_args "pretrained=Qwen/Qwen3-VL-8B-Instruct,attn_implementation=sdpa,vtr_strategy=priortr_2f,vtr_keep_ratio=0.2222,vtr_prune_layer=3" \
     --tasks mme --batch_size 1 \
-    --output_path ../eval_results/mme_infovtr_0.2222
+    --output_path ../eval_results/mme_priortr_2f_0.2222
 ```
 
 ### SparseVLM Baseline
@@ -186,11 +189,11 @@ All VTR parameters are passed via `--model_args` as comma-separated key=value pa
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `vtr_enabled` | bool | `True` | Enable/disable visual token pruning |
-| `vtr_strategy` | str | `priortr` | Pruning strategy: `priortr`, `fastv`, `infovtr`, `sparsevlm`, `vispruner` |
+| `vtr_strategy` | str | `priortr` | Pruning strategy: `priortr`, `fastv`, `priortr_2f`, `sparsevlm`, `vispruner` |
 | `vtr_prune_layer` | int or list | `3` | Layer(s) at which to prune visual tokens (ignored by VisPruner, which always prunes pre-LLM at layer 1) |
 | `vtr_keep_tokens` | int or list | `None` | Exact number of visual tokens to keep (overrides `vtr_keep_ratio`) |
 | `vtr_keep_ratio` | float or list | `0.1111` | Fraction of visual tokens to keep (used when `vtr_keep_tokens` is not set) |
-| `vtr_query_aggregation` | str | `auto` | (priortr/fastv) How to aggregate query attention: `auto` (per-strategy default), `last` (last token), or `question` (all question tokens). Auto resolves to `question` for priortr/infovtr, `last` for others |
+| `vtr_query_aggregation` | str | `auto` | (priortr/fastv) How to aggregate query attention: `auto` (per-strategy default), `last` (last token), or `question` (all question tokens). Auto resolves to `question` for priortr/priortr_2f, `last` for others |
 | `vtr_head_aggregation` | str | `mean` | (priortr/fastv) How to aggregate across attention heads: `mean` or `max` |
 | `vtr_token_merge` | bool | `False` | (SparseVLM) Merge pruned tokens into a few representative tokens instead of dropping them; the cluster count is derived automatically |
 | `vtr_important_ratio` | float | `0.5` | (VisPruner) Fraction of kept tokens chosen by importance; the rest are chosen by diversity |
@@ -218,7 +221,7 @@ All VTR parameters are passed via `--model_args` as comma-separated key=value pa
 │   ├── strategy/
 │   │   ├── priortr.py                 # PriorTR: single-forward V-Information pruning
 │   │   ├── fastv.py                   # FastV: attention-based pruning
-│   │   ├── infovtr.py                 # InfoVTR: two-forward V-Information pruning
+│   │   ├── priortr_2f.py                 # PriorTR-2F: two-forward V-Information pruning
 │   │   ├── sparsevlm.py              # SparseVLM: sparse attention pruning
 │   │   ├── vispruner.py              # VisPruner baseline
 │   │   ├── base.py                   # PruningStrategy abstract base class

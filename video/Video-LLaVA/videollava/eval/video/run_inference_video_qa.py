@@ -17,7 +17,7 @@ from videollava.train.train import smart_tokenizer_and_embedding_resize
 
 
 from videollava.vtr.model import load_vtr_model
-from videollava.vtr import InfoVTRConfig, VTRConfig
+from videollava.vtr import PriorTR2FConfig, VTRConfig
 
 def split_list(lst, n):
     """Split a list into n (roughly) equal-sized chunks"""
@@ -51,7 +51,7 @@ def parse_args():
 
     # VTR configuration
     parser.add_argument('--vtr_enabled', action='store_true', help='Enable VTR pruning')
-    parser.add_argument('--vtr_strategy', type=str, default='infovtr', choices=['infovtr', 'fastv'], help='VTR strategy')
+    parser.add_argument('--vtr_strategy', type=str, default='priortr_2f', choices=['priortr_2f', 'fastv'], help='VTR strategy')
     parser.add_argument('--vtr_prune_layer', type=int, default=3, help='Layer to prune at')
     parser.add_argument('--vtr_keep_tokens', type=int, default=194, help='Number of tokens to keep')
     parser.add_argument('--vtr_query_aggregation', type=str, default='question', choices=['question', 'last'], help='Query aggregation method')
@@ -138,7 +138,7 @@ def run_inference(args):
         model_path=args.model_path,
         model_base=args.model_base,
         model_name=model_name,
-        model_type="infovtr_fixed",
+        model_type="priortr_2f_fixed",
         device=args.device,
     )
     model = model.to(args.device)
@@ -149,9 +149,9 @@ def run_inference(args):
         print(f"VTR enabled: strategy={args.vtr_strategy}, prune_layer={args.vtr_prune_layer}, "
               f"keep_tokens={args.vtr_keep_tokens}, query_agg={args.vtr_query_aggregation}, "
               f"head_agg={args.vtr_head_aggregation}")
-        # Use InfoVTRConfig to support all strategies (infovtr, fastv, etc.)
-        # because infovtr_fixed model requires prior_prompt attribute
-        cfg = InfoVTRConfig(
+        # Use PriorTR2FConfig to support all strategies (priortr_2f, fastv, etc.)
+        # because priortr_2f_fixed model requires prior_prompt attribute
+        cfg = PriorTR2FConfig(
             enabled=True,
             strategy=args.vtr_strategy,
             prune_layer=args.vtr_prune_layer,

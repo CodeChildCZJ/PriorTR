@@ -1,5 +1,5 @@
-# InfoVTR LLaVA Models
-# InfoVTR intermediate base class and two Pipeline implementations.
+# PriorTR-2F LLaVA Models
+# PriorTR-2F intermediate base class and two Pipeline implementations.
 from __future__ import annotations
 
 import logging
@@ -11,18 +11,18 @@ from videollava.constants import IMAGE_TOKEN_INDEX
 from .vtr_llava import VTRLlavaForCausalLM
 
 if TYPE_CHECKING:
-    from ..config import InfoVTRConfig
+    from ..config import PriorTR2FConfig
 
-from ..config import InfoVTRConfig
+from ..config import PriorTR2FConfig
 
 logger = logging.getLogger(__name__)
 
 
-class InfoVTRBaseLlava(VTRLlavaForCausalLM):
+class PriorTR2FBaseLlava(VTRLlavaForCausalLM):
     """
-    InfoVTR intermediate base class.
+    PriorTR-2F intermediate base class.
 
-    Contains InfoVTR-specific methods:
+    Contains PriorTR-2F-specific methods:
     - _build_prior_inputs(): build inputs for prior forward
     - _extract_layer_attention(): extract attention at specified layers
     """
@@ -68,8 +68,8 @@ class InfoVTRBaseLlava(VTRLlavaForCausalLM):
 
         return prior_input_ids, images
 
-    def setup_vtr(self, config: InfoVTRConfig):
-        """Set up InfoVTR configuration. Also propagates to internal model."""
+    def setup_vtr(self, config: PriorTR2FConfig):
+        """Set up PriorTR-2F configuration. Also propagates to internal model."""
         self._vtr_config = config
         self.model.setup_vtr(config)
 
@@ -160,9 +160,9 @@ class InfoVTRBaseLlava(VTRLlavaForCausalLM):
         return aggregated_attentions
 
 
-class FixedLayerInfoVTR(InfoVTRBaseLlava):
+class FixedLayerPriorTR2F(PriorTR2FBaseLlava):
     """
-    InfoVTR Pipeline A: Fixed pruning layer.
+    PriorTR-2F Pipeline A: Fixed pruning layer.
 
     Flow (2 Forwards):
     1. Prior Forward: use prior_prompt to get Q
@@ -183,7 +183,7 @@ class FixedLayerInfoVTR(InfoVTRBaseLlava):
         2. Extract prune_layer prior attention (Q)
         3. Return {prior_attention: Q}
         """
-        config: InfoVTRConfig = self._vtr_config
+        config: PriorTR2FConfig = self._vtr_config
 
         # 1. Build prior inputs
         prior_input_ids, prior_images = self._build_prior_inputs(
@@ -202,9 +202,9 @@ class FixedLayerInfoVTR(InfoVTRBaseLlava):
         return {"prior_attentions": prior_attentions}
 
 
-class AdaptiveLayerInfoVTR(InfoVTRBaseLlava):
+class AdaptiveLayerPriorTR2F(PriorTR2FBaseLlava):
     """
-    InfoVTR Pipeline B: Adaptive pruning layer.
+    PriorTR-2F Pipeline B: Adaptive pruning layer.
 
     Flow (3 Forwards):
     1. Prior Forward: use prior_prompt to get Q for all candidate layers
@@ -227,7 +227,7 @@ class AdaptiveLayerInfoVTR(InfoVTRBaseLlava):
         3. Select layer with largest KL(P||Q)
         4. Return {prior_attention: Q_best, prune_layer: best_layer}
         """
-        config: InfoVTRConfig = self._vtr_config
+        config: PriorTR2FConfig = self._vtr_config
         candidate_layers = config.candidate_layers
 
         # 1. Build prior inputs
@@ -256,7 +256,7 @@ class AdaptiveLayerInfoVTR(InfoVTRBaseLlava):
         self._vtr_config.prune_layer = best_layer
         self.model._vtr_config.prune_layer = best_layer
 
-        logger.debug(f"AdaptiveLayerInfoVTR selected layer {best_layer}")
+        logger.debug(f"AdaptiveLayerPriorTR2F selected layer {best_layer}")
 
         return {
             "prior_attentions": {best_layer: Q_dict[best_layer]},

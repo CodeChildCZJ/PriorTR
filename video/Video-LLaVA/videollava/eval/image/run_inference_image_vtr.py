@@ -1,6 +1,6 @@
 """
 Image evaluation script with VTR support for MME and GQA benchmarks.
-Supports baseline, fastv, and infovtr_fixed strategies.
+Supports baseline, fastv, and priortr_2f_fixed strategies.
 """
 import math
 import os
@@ -21,7 +21,7 @@ from videollava.mm_utils import (
     KeywordsStoppingCriteria, process_images
 )
 from videollava.vtr.model import load_vtr_model
-from videollava.vtr import InfoVTRConfig, VTRConfig
+from videollava.vtr import PriorTR2FConfig, VTRConfig
 
 
 def split_list(lst, n):
@@ -64,8 +64,8 @@ def parse_args():
 
     # VTR configuration
     parser.add_argument('--vtr_enabled', action='store_true', help='Enable VTR pruning')
-    parser.add_argument('--vtr_strategy', type=str, default='infovtr',
-                       choices=['infovtr', 'fastv'], help='VTR strategy')
+    parser.add_argument('--vtr_strategy', type=str, default='priortr_2f',
+                       choices=['priortr_2f', 'fastv'], help='VTR strategy')
     parser.add_argument('--vtr_prune_layer', type=int, default=3, help='Layer to prune at')
     parser.add_argument('--vtr_keep_tokens', type=int, default=192, help='Number of tokens to keep')
     parser.add_argument('--vtr_query_aggregation', type=str, default='question',
@@ -88,7 +88,7 @@ def eval_model(args):
         model_path=args.model_path,
         model_base=args.model_base,
         model_name=model_name,
-        model_type="infovtr_fixed",
+        model_type="priortr_2f_fixed",
         device=args.device,
     )
     model = model.to(args.device)
@@ -97,7 +97,7 @@ def eval_model(args):
     if args.vtr_enabled:
         print(f"VTR enabled: strategy={args.vtr_strategy}, layer={args.vtr_prune_layer}, "
               f"keep_tokens={args.vtr_keep_tokens}, query_agg={args.vtr_query_aggregation}")
-        cfg = InfoVTRConfig(
+        cfg = PriorTR2FConfig(
             enabled=True,
             strategy=args.vtr_strategy,
             prune_layer=args.vtr_prune_layer,

@@ -23,7 +23,7 @@ Default *values* are intentionally left to each subproject's own config (single
 source of truth) — the launcher only injects an "intended" default where it
 differs from the bare config default (e.g. SparseVLM token_merge=True).
 
-Note: InfoVTR and Video-LLaVA are intentionally not wired in yet.
+Note: PriorTR-2F and Video-LLaVA are intentionally not wired in yet.
 """
 
 import argparse
@@ -48,7 +48,7 @@ import sys
 #                     user overrides it (only where intended != bare default)
 #   method_notes    : caveats surfaced by --describe / warnings
 #   needs_pp_parent : export PYTHONPATH=<subproject dir> (package not pip-installed)
-# NOTE: 'infovtr' is deliberately absent from every `methods` list for now.
+# NOTE: 'priortr_2f' is deliberately absent from every `methods` list for now.
 # --------------------------------------------------------------------------- #
 REGISTRY = {
     "llava": {
@@ -131,7 +131,7 @@ REGISTRY = {
 }
 
 # Methods that exist in some subprojects but are held back from the runner.
-DEFERRED_METHODS = {"infovtr"}
+DEFERRED_METHODS = {"priortr_2f"}
 
 REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
 ALL_METHODS = ["priortr", "fastv", "sparsevlm", "vispruner", "baseline"]
@@ -202,7 +202,7 @@ def print_capability_matrix():
         print(row + cells)
     if envs is None:
         print("\n(could not query conda envs — is conda on PATH?)")
-    print("\n(InfoVTR is intentionally not included yet — handled separately later.)")
+    print("\n(PriorTR-2F is intentionally not included yet — handled separately later.)")
     print("Run `--describe <model> <method>` to see that combo's tunable hyperparameters.")
 
 

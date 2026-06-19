@@ -1,11 +1,13 @@
-# PriorTR on Video-LLaVA (InfoVTR)
+# PriorTR-2F on Video-LLaVA
 
-Visual token pruning for video understanding using V-Information theory. Since video
-models lack the causal mask shortcut available to image-only models, InfoVTR uses a
-two-forward approach: a **prior forward** (with an empty/generic prompt) followed by a
-**task forward** (with the real question). The V-Information score
-`S = P * log(P / Q)` identifies visual tokens that carry task-specific information
-beyond what the prior already captures, then prunes the rest.
+Visual token pruning for video understanding using V-Information theory.
+**PriorTR-2F is the two-forward variant of PriorTR**: same task attention `P` and same
+score `S = P * log(P / Q)`; the prior `Q` comes from an explicit prior forward instead of
+PriorTR's single-forward causal-mask shortcut. Video models lack that shortcut available
+to image-only models, so here PriorTR-2F uses the two-forward approach: a **prior forward**
+(with an empty/generic prompt) followed by a **task forward** (with the real question). The
+V-Information score `S = P * log(P / Q)` identifies visual tokens that carry task-specific
+information beyond what the prior already captures, then prunes the rest.
 
 ## Environment Setup
 
@@ -79,7 +81,7 @@ python videollava/eval/video/run_inference_video_qa.py \
     --num_samples 500
 ```
 
-### InfoVTR (V-Information pruning)
+### PriorTR-2F (V-Information pruning)
 
 ```bash
 python videollava/eval/video/run_inference_video_qa.py \
@@ -88,10 +90,10 @@ python videollava/eval/video/run_inference_video_qa.py \
     --video_dir /path/to/MSVD/videos \
     --gt_file_question /path/to/MSVD/test_q.json \
     --gt_file_answers /path/to/MSVD/test_a.json \
-    --output_dir output/msvd_infovtr_k64 \
+    --output_dir output/msvd_priortr_2f_k64 \
     --output_name pred \
     --vtr_enabled \
-    --vtr_strategy infovtr \
+    --vtr_strategy priortr_2f \
     --vtr_prune_layer 3 \
     --vtr_keep_tokens 64 \
     --vtr_query_aggregation question \
@@ -125,9 +127,9 @@ After inference, evaluate predictions using the GPT-based scorer:
 
 ```bash
 python videollava/eval/video/eval_video_qa.py \
-    --pred_path output/msvd_infovtr_k64/pred.json \
-    --output_dir output/msvd_infovtr_k64/gpt_eval \
-    --output_json output/msvd_infovtr_k64/results.json \
+    --pred_path output/msvd_priortr_2f_k64/pred.json \
+    --output_dir output/msvd_priortr_2f_k64/gpt_eval \
+    --output_json output/msvd_priortr_2f_k64/results.json \
     --api_key YOUR_OPENAI_API_KEY \
     --api_base https://api.openai.com/v1 \
     --model gpt-3.5-turbo \
@@ -142,15 +144,15 @@ average score (0-5).
 | Parameter | CLI Flag | Default | Description |
 |---|---|---|---|
 | enabled | `--vtr_enabled` | `False` | Enable visual token reduction |
-| strategy | `--vtr_strategy` | `infovtr` | Pruning strategy: `infovtr`, `fastv` |
+| strategy | `--vtr_strategy` | `priortr_2f` | Pruning strategy: `priortr_2f`, `fastv` |
 | prune_layer | `--vtr_prune_layer` | `3` | LLM layer index at which to prune |
 | keep_tokens | `--vtr_keep_tokens` | `194` | Number of visual tokens to keep after pruning |
 | keep_ratio | (config only) | `0.25` | Fraction of tokens to keep (ignored when keep_tokens is set) |
 | query_aggregation | `--vtr_query_aggregation` | `question` | Which query positions to aggregate: `question` (all question tokens) or `last` (last token only) |
 | head_aggregation | `--vtr_head_aggregation` | `mean` | How to aggregate across attention heads: `mean` or `max` |
-| prior_prompt | (config only) | `""` | Prompt used during the prior forward pass (InfoVTR only) |
-| score_threshold | (config only) | `None` | Keep tokens with V-Info score above this threshold (InfoVTR only) |
-| adaptive_layer | (config only) | `False` | Enable adaptive layer selection across candidate layers (InfoVTR only) |
+| prior_prompt | (config only) | `""` | Prompt used during the prior forward pass (PriorTR-2F only) |
+| score_threshold | (config only) | `None` | Keep tokens with V-Info score above this threshold (PriorTR-2F only) |
+| adaptive_layer | (config only) | `False` | Enable adaptive layer selection across candidate layers (PriorTR-2F only) |
 
 ### Verify Installation
 
@@ -159,8 +161,8 @@ python -c "
 import torch; print(f'PyTorch: {torch.__version__}, CUDA: {torch.cuda.is_available()}')
 import transformers; print(f'Transformers: {transformers.__version__}')
 from videollava.vtr.model import load_vtr_model
-from videollava.vtr.config import VTRConfig, InfoVTRConfig
-from videollava.vtr.strategy import InfoVTRStrategy, FastVStrategy
+from videollava.vtr.config import VTRConfig, PriorTR2FConfig
+from videollava.vtr.strategy import PriorTR2FStrategy, FastVStrategy
 print('VTR OK')
 "
 ```
@@ -192,11 +194,11 @@ Video-LLaVA/
 │   │       └── eval_video_qa.py           # GPT-based evaluation
 │   └── vtr/                           # Visual Token Reduction framework
 │       ├── __init__.py
-│       ├── config.py                  # VTRConfig, InfoVTRConfig
+│       ├── config.py                  # VTRConfig, PriorTR2FConfig
 │       ├── strategy/
 │       │   ├── base.py               # PruningStrategy base class
 │       │   ├── registry.py           # Strategy registry
-│       │   ├── infovtr.py            # InfoVTR (V-Information)
+│       │   ├── priortr_2f.py            # PriorTR-2F (V-Information)
 │       │   └── fastv.py              # FastV (attention-based)
 │       ├── model/
 │       │   ├── builder.py            # load_vtr_model()
@@ -204,7 +206,7 @@ Video-LLaVA/
 │       │   ├── rope_utils.py         # Unbounded RoPE for sparse position IDs
 │       │   ├── vtr_llava.py          # Base VTR-enabled LLaVA
 │       │   ├── fastv_llava.py        # FastV variant
-│       │   └── infovtr_llava.py      # InfoVTR variants (fixed / adaptive layer)
+│       │   └── priortr_2f_llava.py      # PriorTR-2F variants (fixed / adaptive layer)
 │       └── utlis/
 │           └── modeling_attn_mask_utils.py  # Custom attention mask utilities
 ├── pyproject.toml

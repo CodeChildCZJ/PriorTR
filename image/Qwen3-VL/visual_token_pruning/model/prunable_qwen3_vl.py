@@ -606,7 +606,7 @@ class PrunableQwen3VLTextModel(Qwen3VLTextModel):
         (position_ids, attention_mask, KV cache, etc.) when the sequence length
         changes due to token merging.
 
-        For strategies without token merge (FastV, InfoVTR), post_prune is a
+        For strategies without token merge (FastV, PriorTR-2F), post_prune is a
         no-op and this method returns immediately with no changes.
         """
         seq_before = hidden_states.shape[1]

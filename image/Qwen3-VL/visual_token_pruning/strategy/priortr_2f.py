@@ -1,13 +1,21 @@
-"""InfoVTR strategy implementation.
+"""PriorTR-2F strategy implementation.
 
-InfoVTR uses V-Information (S scores) to measure the task-specific
-information gain of each visual token relative to a prior baseline.
+PriorTR-2F is the two-forward variant of PriorTR. It uses the identical task
+attention P and the identical V-Information score S = P * log(P / Q); the only
+difference is how the prior Q is obtained:
+  - PriorTR (single-forward) harvests Q from the <|vision_end|> token's attention
+    within the one task forward — the causal mask makes that token's attention to
+    the image independent of the question, approximating a question-free prior.
+  - PriorTR-2F (this strategy) instead computes Q from an explicit second forward
+    over [system + image] with the question removed (a "prior forward").
+
+So PriorTR is the single-forward approximation of PriorTR-2F's explicit prior.
 
 S = P * log(P / Q)
 - P: Task attention (with question)
-- Q: Prior attention (without question, baseline)
+- Q: Prior attention (explicit prior forward, without question)
 - S > 0: Token provides extra information for the current task
-- S < 0: Token is less important than baseline
+- S < 0: Token is less important than the prior baseline
 - S ~ 0: Token has no task-specific contribution
 
 Reference: V-Information based Visual Token Reduction
@@ -24,10 +32,10 @@ from .base import VTRStrategy
 logger = logging.getLogger(__name__)
 
 
-class InfoVTRStrategy(VTRStrategy):
-    """InfoVTR strategy for visual token pruning.
+class PriorTR2FStrategy(VTRStrategy):
+    """PriorTR-2F strategy for visual token pruning.
 
-    InfoVTR computes V-Information scores by comparing task-specific attention (P)
+    PriorTR-2F computes V-Information scores by comparing task-specific attention (P)
     against a prior baseline attention (Q). Tokens with higher S scores contribute
     more task-relevant information and should be preserved.
 
@@ -38,8 +46,8 @@ class InfoVTRStrategy(VTRStrategy):
         - prior_attentions: A dict {layer_idx: tensor} for multi-layer support
 
     Example:
-        >>> strategy = InfoVTRStrategy()
-        >>> config = VTRConfig(enabled=True, strategy="infovtr", keep_ratio=0.25)
+        >>> strategy = PriorTR2FStrategy()
+        >>> config = VTRConfig(enabled=True, strategy="priortr_2f", keep_ratio=0.25)
         >>> # P from task forward, Q from prior forward
         >>> scores = strategy.compute_scores(
         ...     attention, image_range, config,
@@ -111,15 +119,15 @@ class InfoVTRStrategy(VTRStrategy):
 
         # Handle numerical issues
         if torch.isnan(S).any():
-            logger.warning("NaN detected in InfoVTR scores, replacing with zeros.")
+            logger.warning("NaN detected in PriorTR-2F scores, replacing with zeros.")
             S = torch.nan_to_num(S, nan=0.0)
         if torch.isinf(S).any():
-            logger.warning("Inf detected in InfoVTR scores, clamping values.")
+            logger.warning("Inf detected in PriorTR-2F scores, clamping values.")
             S = torch.clamp(S, min=-1e6, max=1e6)
 
         if config.debug:
             logger.debug(
-                f"InfoVTR scores: shape={S.shape}, "
+                f"PriorTR-2F scores: shape={S.shape}, "
                 f"min={S.min():.6f}, max={S.max():.6f}, "
                 f"mean={S.mean():.6f}, "
                 f"positive_ratio={((S > 0).sum().item() / S.numel()):.2%}"
@@ -169,7 +177,7 @@ class InfoVTRStrategy(VTRStrategy):
             return prior_attentions.pop(target_layer)
 
         raise ValueError(
-            "InfoVTR requires 'prior_attention' or 'prior_attentions' in context. "
+            "PriorTR-2F requires 'prior_attention' or 'prior_attentions' in context. "
             "Run a prior forward pass first using extract_prior_attention()."
         )
 
@@ -241,4 +249,4 @@ class InfoVTRStrategy(VTRStrategy):
 
     def __repr__(self) -> str:
         """Return string representation of the strategy."""
-        return "InfoVTRStrategy()"
+        return "PriorTR2FStrategy()"

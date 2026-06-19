@@ -1,40 +1,40 @@
 # Visual Token Reduction (VTR) Framework
 # Prunes visual tokens during LLM inference.
 
-from .config import VTRConfig, InfoVTRConfig
+from .config import VTRConfig, PriorTR2FConfig
 from .strategy import (
     PruningStrategy,
     VTR_REGISTRY,
     register_strategy,
     get_strategy,
     FastVStrategy,
-    InfoVTRStrategy,
+    PriorTR2FStrategy,
 )
 from .model import (
     PrunableLlamaModel,
     VTRLlavaForCausalLM,
     FastVLlava,
-    InfoVTRBaseLlava,
-    FixedLayerInfoVTR,
-    AdaptiveLayerInfoVTR,
+    PriorTR2FBaseLlava,
+    FixedLayerPriorTR2F,
+    AdaptiveLayerPriorTR2F,
 )
 
 __all__ = [
     # Config
     "VTRConfig",
-    "InfoVTRConfig",
+    "PriorTR2FConfig",
     # Strategy
     "PruningStrategy",
     "VTR_REGISTRY",
     "register_strategy",
     "get_strategy",
     "FastVStrategy",
-    "InfoVTRStrategy",
+    "PriorTR2FStrategy",
     # Model
     "PrunableLlamaModel",
     "VTRLlavaForCausalLM",
     "FastVLlava",
-    "InfoVTRBaseLlava",
-    "FixedLayerInfoVTR",
-    "AdaptiveLayerInfoVTR",
+    "PriorTR2FBaseLlava",
+    "FixedLayerPriorTR2F",
+    "AdaptiveLayerPriorTR2F",
 ]

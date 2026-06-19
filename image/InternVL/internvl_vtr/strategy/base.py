@@ -36,7 +36,7 @@ class PruningStrategy(ABC):
             attention: attention weights [batch, heads, seq, seq]
             image_token_range: position range of image tokens (start, end)
             config: VTR config
-            **ctx: extra context (e.g. prior_attention for InfoVTR)
+            **ctx: extra context (e.g. prior_attention for PriorTR-2F)
 
         Returns:
             scores: per-image-token scores [num_image_tokens]

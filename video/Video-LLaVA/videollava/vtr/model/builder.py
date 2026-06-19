@@ -12,14 +12,14 @@ from videollava.constants import (
 # Import VTR classes
 from .vtr_llava import VTRLlavaForCausalLM
 from .fastv_llava import FastVLlava
-from .infovtr_llava import FixedLayerInfoVTR, AdaptiveLayerInfoVTR
+from .priortr_2f_llava import FixedLayerPriorTR2F, AdaptiveLayerPriorTR2F
 
 # Strategy to model class mapping
 VTR_MODEL_CLASSES = {
     "vtr_base": VTRLlavaForCausalLM,
     "fastv": FastVLlava,
-    "infovtr_fixed": FixedLayerInfoVTR,
-    "infovtr_adaptive": AdaptiveLayerInfoVTR,
+    "priortr_2f_fixed": FixedLayerPriorTR2F,
+    "priortr_2f_adaptive": AdaptiveLayerPriorTR2F,
 }
 
 def load_vtr_model(model_path, model_base=None, model_name=None, model_type="fastv",

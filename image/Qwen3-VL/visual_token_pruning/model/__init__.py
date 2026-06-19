@@ -3,7 +3,7 @@
 This module provides the PrunableQwen3VLTextModel, which extends the standard
 Qwen3-VL text decoder to support visual token pruning at specified layers.
 
-It also provides prior forward utilities for the InfoVTR strategy:
+It also provides prior forward utilities for the PriorTR-2F strategy:
     - build_prior_input: Construct prior input IDs
     - extract_prior_attention: Execute prior forward and extract attention
 

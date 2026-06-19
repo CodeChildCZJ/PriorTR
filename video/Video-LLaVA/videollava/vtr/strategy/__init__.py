@@ -2,7 +2,7 @@
 from .base import PruningStrategy
 from .registry import VTR_REGISTRY, register_strategy, get_strategy
 from .fastv import FastVStrategy
-from .infovtr import InfoVTRStrategy
+from .priortr_2f import PriorTR2FStrategy
 
 __all__ = [
     "PruningStrategy",
@@ -10,6 +10,6 @@ __all__ = [
     "register_strategy",
     "get_strategy",
     "FastVStrategy",
-    "InfoVTRStrategy",
+    "PriorTR2FStrategy",
 ]
 

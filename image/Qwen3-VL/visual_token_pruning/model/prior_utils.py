@@ -1,10 +1,10 @@
-"""Prior forward utilities for InfoVTR strategy.
+"""Prior forward utilities for PriorTR-2F strategy.
 
 This module provides functions to construct prior inputs and extract
-prior attention scores for the InfoVTR visual token reduction strategy.
+prior attention scores for the PriorTR-2F visual token reduction strategy.
 
 The prior forward pass generates baseline attention (Q) by running the model
-on an input without the task-specific question, allowing the InfoVTR strategy
+on an input without the task-specific question, allowing the PriorTR-2F strategy
 to compute V-Information scores: S = P * log(P / Q).
 
 Two modes for constructing prior input:

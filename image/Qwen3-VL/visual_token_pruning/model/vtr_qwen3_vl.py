@@ -29,7 +29,7 @@ from transformers.models.qwen3_vl.modeling_qwen3_vl import (
 from ..config import VTRConfig
 from ..strategy.base import VTRStrategy
 from ..strategy.fastv import FastVStrategy
-from ..strategy.infovtr import InfoVTRStrategy
+from ..strategy.priortr_2f import PriorTR2FStrategy
 from .prior_utils import build_prior_input, compute_prior_image_token_range, extract_prior_attention
 from .prunable_qwen3_vl import PrunableQwen3VLTextModel
 
@@ -46,7 +46,7 @@ class VTRQwen3VLForConditionalGeneration(Qwen3VLForConditionalGeneration):
     The model supports multiple pruning strategies:
         - PriorTR: Single-forward V-Information pruning using causal attention.
         - FastV: Uses direct attention weights for pruning decisions.
-        - InfoVTR: Uses V-Information (two-forward) for importance estimation.
+        - PriorTR-2F: Uses V-Information (two-forward) for importance estimation.
         - SparseVLM: Sparse attention pruning with optional token merging.
         - VisPruner: Importance + diversity based pruning.
 
@@ -82,7 +82,7 @@ class VTRQwen3VLForConditionalGeneration(Qwen3VLForConditionalGeneration):
         """Create a VTR strategy instance by name.
 
         Args:
-            strategy_name: Name of the strategy ("fastv", "infovtr", "sparsevlm", or "priortr").
+            strategy_name: Name of the strategy ("fastv", "priortr_2f", "sparsevlm", or "priortr").
 
         Returns:
             An instance of the corresponding VTRStrategy subclass.
@@ -92,8 +92,8 @@ class VTRQwen3VLForConditionalGeneration(Qwen3VLForConditionalGeneration):
         """
         if strategy_name == "fastv":
             return FastVStrategy()
-        elif strategy_name == "infovtr":
-            return InfoVTRStrategy()
+        elif strategy_name == "priortr_2f":
+            return PriorTR2FStrategy()
         elif strategy_name == "sparsevlm":
             from ..strategy.sparsevlm import SparseVLMStrategy
             return SparseVLMStrategy()
@@ -106,7 +106,7 @@ class VTRQwen3VLForConditionalGeneration(Qwen3VLForConditionalGeneration):
         else:
             raise ValueError(
                 f"Unknown VTR strategy: '{strategy_name}'. "
-                f"Must be one of: 'fastv', 'infovtr', 'sparsevlm', 'priortr', 'vispruner'"
+                f"Must be one of: 'fastv', 'priortr_2f', 'sparsevlm', 'priortr', 'vispruner'"
             )
 
     def _replace_text_model(self) -> None:
@@ -173,7 +173,7 @@ class VTRQwen3VLForConditionalGeneration(Qwen3VLForConditionalGeneration):
         """Prepare VTR context for the generation forward pass.
 
         For FastV, this returns an empty context (no prior needed).
-        For InfoVTR, this runs a prior forward pass to compute baseline
+        For PriorTR-2F, this runs a prior forward pass to compute baseline
         attention scores for V-Information computation.
 
         Args:
@@ -185,12 +185,12 @@ class VTRQwen3VLForConditionalGeneration(Qwen3VLForConditionalGeneration):
                 template-mode prior construction.
 
         Returns:
-            Dictionary containing VTR context. For InfoVTR, includes
+            Dictionary containing VTR context. For PriorTR-2F, includes
             'prior_attention' tensor with shape [num_image_tokens].
         """
         vtr_context: Dict = {"image_token_range": image_token_range}
 
-        if self.vtr_config.strategy == "infovtr":
+        if self.vtr_config.strategy == "priortr_2f":
             prior_input_ids = build_prior_input(
                 input_ids=input_ids,
                 processor=kwargs.get("processor"),
@@ -218,7 +218,7 @@ class VTRQwen3VLForConditionalGeneration(Qwen3VLForConditionalGeneration):
             vtr_context["prior_attention"] = prior_attention
 
             logger.debug(
-                f"InfoVTR prior computed: "
+                f"PriorTR-2F prior computed: "
                 f"prior_len={prior_input_ids.shape[1]}, "
                 f"prior_image_range={prior_image_range}"
             )
@@ -446,7 +446,7 @@ class VTRQwen3VLForConditionalGeneration(Qwen3VLForConditionalGeneration):
         When vtr_config.enabled is True:
             1. Checks for video input (skips VTR if video_pruning_mode="none")
             2. Computes image_token_range from input_ids
-            3. Prepares VTR context (InfoVTR runs prior forward)
+            3. Prepares VTR context (PriorTR-2F runs prior forward)
             4. Injects VTR parameters into generation kwargs
             5. Calls parent generate()
 
@@ -725,7 +725,7 @@ class VTRQwen3VLForConditionalGeneration(Qwen3VLForConditionalGeneration):
         Example:
             >>> model = VTRQwen3VLForConditionalGeneration.from_pretrained_vtr(
             ...     "Qwen/Qwen3-VL-8B-Instruct",
-            ...     vtr_config=VTRConfig(enabled=True, strategy="infovtr", keep_ratio=0.5),
+            ...     vtr_config=VTRConfig(enabled=True, strategy="priortr_2f", keep_ratio=0.5),
             ...     torch_dtype=torch.float16,
             ...     device_map="auto",
             ... )

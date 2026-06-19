@@ -7,7 +7,7 @@ from typing import Tuple, Optional, TYPE_CHECKING
 import torch
 
 if TYPE_CHECKING:
-    from ..config import VTRConfig, InfoVTRConfig
+    from ..config import VTRConfig, PriorTR2FConfig
 
 
 class PruningStrategy(ABC):
@@ -18,7 +18,7 @@ class PruningStrategy(ABC):
 
     Token selection priority (highest to lowest):
     1. keep_tokens: keep an exact number of tokens
-    2. score_threshold: keep tokens with score above threshold (InfoVTRConfig only)
+    2. score_threshold: keep tokens with score above threshold (PriorTR2FConfig only)
     3. keep_ratio: keep tokens by ratio
     """
 
@@ -37,7 +37,7 @@ class PruningStrategy(ABC):
             attention: attention weights at current layer [batch, heads, seq, seq]
             image_token_range: position range of image tokens (start, end)
             config: VTR configuration
-            **ctx: extra context (e.g., InfoVTR needs prior_attention)
+            **ctx: extra context (e.g., PriorTR-2F needs prior_attention)
 
         Returns:
             scores: per-image-token scores [num_image_tokens]
@@ -55,7 +55,7 @@ class PruningStrategy(ABC):
 
         Selection priority (highest to lowest):
         1. keep_tokens: keep an exact number of tokens
-        2. score_threshold: keep tokens with score > threshold (InfoVTRConfig only)
+        2. score_threshold: keep tokens with score > threshold (PriorTR2FConfig only)
         3. keep_ratio: keep Top-K by ratio
 
         Args:
@@ -76,7 +76,7 @@ class PruningStrategy(ABC):
             else:
                 keep_indices = scores.topk(k).indices
 
-        # Priority 2: score_threshold (threshold mode, InfoVTRConfig only)
+        # Priority 2: score_threshold (threshold mode, PriorTR2FConfig only)
         elif hasattr(config, "score_threshold") and config.score_threshold is not None:
             keep_indices = torch.where(scores > config.score_threshold)[0]
             # If no token meets the threshold, keep at least the highest-scoring one

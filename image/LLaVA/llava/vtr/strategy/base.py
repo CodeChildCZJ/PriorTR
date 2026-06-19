@@ -7,7 +7,7 @@ from typing import Tuple, Optional, TYPE_CHECKING
 import torch
 
 if TYPE_CHECKING:
-    from ..config import VTRConfig, InfoVTRConfig
+    from ..config import VTRConfig
 
 
 class PruningStrategy(ABC):

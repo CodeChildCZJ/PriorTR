@@ -60,7 +60,7 @@ class VTRStrategy(ABC):
             config: VTR configuration object.
             layer_idx: Index of the current pruning layer (0-based among prune layers).
             **context: Additional context that may be needed by specific strategies.
-                For example, InfoVTR requires `prior_attention`.
+                For example, PriorTR-2F requires `prior_attention`.
 
         Returns:
             A 1D tensor of shape [num_image_tokens] containing importance scores

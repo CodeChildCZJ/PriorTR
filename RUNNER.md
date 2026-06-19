@@ -25,7 +25,7 @@ qwen3vl   PriorTRqwen3vl         ✓      ✓        ✓          ✓          �
 Run `python vtr_run.py --list` to print it. Illegal combinations (e.g.
 `--model llava --method fastv`) are rejected with the supported list.
 
-> **InfoVTR** and **Video-LLaVA** are intentionally not wired in yet — they
+> **PriorTR-2F** and **Video-LLaVA** are intentionally not wired in yet — they
 > are handled separately later.
 
 ## Usage

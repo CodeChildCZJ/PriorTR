@@ -12,7 +12,7 @@ class VTRConfig:
 
     Token retention priority (highest to lowest):
     1. keep_tokens: keep an exact number of tokens
-    2. score_threshold: keep tokens with score above threshold (InfoVTRConfig only)
+    2. score_threshold: keep tokens with score above threshold (PriorTR2FConfig only)
     3. keep_ratio: keep tokens by ratio
     """
     # Whether to enable VTR
@@ -101,11 +101,11 @@ class VTRConfig:
 
 
 @dataclass
-class InfoVTRConfig(VTRConfig):
+class PriorTR2FConfig(VTRConfig):
     """
-    InfoVTR-specific configuration.
+    PriorTR-2F-specific configuration.
 
-    Inherits VTRConfig and adds InfoVTR-specific options.
+    Inherits VTRConfig and adds PriorTR-2F-specific options.
 
     Token retention priority (highest to lowest):
     1. keep_tokens: keep an exact number of tokens
@@ -113,7 +113,7 @@ class InfoVTRConfig(VTRConfig):
     3. keep_ratio: keep tokens by ratio
     """
     # Override default strategy name
-    strategy: str = "infovtr"
+    strategy: str = "priortr_2f"
 
     # Prior prompt (empty string means empty prompt)
     prior_prompt: str = ""
@@ -150,6 +150,6 @@ class InfoVTRConfig(VTRConfig):
         return d
 
     @classmethod
-    def from_dict(cls, d: dict) -> InfoVTRConfig:
+    def from_dict(cls, d: dict) -> PriorTR2FConfig:
         """Create from dictionary."""
         return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})

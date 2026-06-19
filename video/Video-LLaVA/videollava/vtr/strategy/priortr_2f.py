@@ -1,4 +1,4 @@
-# InfoVTR Strategy
+# PriorTR-2F Strategy
 from __future__ import annotations
 
 import logging
@@ -10,19 +10,24 @@ from .base import PruningStrategy
 from .registry import register_strategy
 
 if TYPE_CHECKING:
-    from ..config import VTRConfig, InfoVTRConfig
+    from ..config import VTRConfig, PriorTR2FConfig
 
 logger = logging.getLogger(__name__)
 
 
-@register_strategy("infovtr")
-class InfoVTRStrategy(PruningStrategy):
+@register_strategy("priortr_2f")
+class PriorTR2FStrategy(PruningStrategy):
     """
-    InfoVTR pruning strategy.
+    PriorTR-2F pruning strategy (two-forward variant of PriorTR).
 
-    Based on V-Information: S = P * log(P / Q)
-    - P: Task attention (current task's attention)
-    - Q: Prior attention (prior attention)
+    Same task attention P and V-Information score S = P * log(P / Q) as PriorTR;
+    the prior Q comes from an explicit question-free forward pass rather than
+    PriorTR's single-forward causal-mask shortcut. Video-LLaVA uses this
+    two-forward form because video lacks the causal-mask shortcut that lets
+    image-only PriorTR read the prior from a single forward.
+
+    - P: Task attention (with the question)
+    - Q: Prior attention (explicit prior forward, without the question)
     - S > 0 indicates extra information gain for the current task
 
     Reference: V-Information based Visual Token Reduction
@@ -36,7 +41,7 @@ class InfoVTRStrategy(PruningStrategy):
         **ctx,
     ) -> torch.Tensor:
         """
-        Compute InfoVTR scores (S = P * log(P / Q)).
+        Compute PriorTR-2F scores (S = P * log(P / Q)).
 
         Logic:
         ctx["prior_attentions"] is a {layer_idx: tensor} dictionary.
@@ -55,7 +60,7 @@ class InfoVTRStrategy(PruningStrategy):
         # 1. Get prior_attentions dictionary
         prior_attentions = ctx.get("prior_attentions")
         if prior_attentions is None or not isinstance(prior_attentions, dict):
-            raise ValueError(f"InfoVTR requires 'prior_attentions' to be a dict in ctx. Got: {type(prior_attentions)}")
+            raise ValueError(f"PriorTR-2F requires 'prior_attentions' to be a dict in ctx. Got: {type(prior_attentions)}")
 
         if len(prior_attentions) == 0:
             raise ValueError("prior_attentions dict is empty! No prior info available for this layer.")
@@ -76,7 +81,7 @@ class InfoVTRStrategy(PruningStrategy):
         # Shape mismatch handling for multi-layer pruning
         if P.shape[0] != prior_attention.shape[0]:
              if prior_attention.shape[0] > P.shape[0]:
-                 logger.warning(f"Shape mismatch in InfoVTR: P={P.shape}, Q={prior_attention.shape}. "
+                 logger.warning(f"Shape mismatch in PriorTR-2F: P={P.shape}, Q={prior_attention.shape}. "
                                 f"This might cause errors if Q was not pruned along with P.")
 
         # Convert to float32 for high-precision computation
@@ -92,10 +97,10 @@ class InfoVTRStrategy(PruningStrategy):
         S = P * torch.log((P + eps) / (Q + eps))
         # Numerical stability checks
         if torch.isnan(S).any():
-            logger.warning("NaN detected in InfoVTR scores, replacing with zeros")
+            logger.warning("NaN detected in PriorTR-2F scores, replacing with zeros")
             S = torch.nan_to_num(S, nan=0.0)
         if torch.isinf(S).any():
-            logger.warning("Inf detected in InfoVTR scores, clamping values")
+            logger.warning("Inf detected in PriorTR-2F scores, clamping values")
             S = torch.clamp(S, min=-1e6, max=1e6)
 
         return S.to(original_dtype)
