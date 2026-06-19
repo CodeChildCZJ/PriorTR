@@ -272,7 +272,12 @@ def build_inner_command(model, spec, method, args, user_params):
            f'--tasks {args.tasks} --batch_size {args.batch_size}{limit} '
            f'--output_path {shlex.quote(output)}')
 
-    parts = [f"cd {shlex.quote(lmms_dir)}"]
+    # An active uv/virtualenv (VIRTUAL_ENV) shadows the conda env's python on
+    # PATH — and accelerate-spawned workers inherit it too. Neutralize it and
+    # put the conda env (CONDA_PREFIX, set by `conda run`) first on PATH.
+    parts = ['unset VIRTUAL_ENV',
+             'export PATH="$CONDA_PREFIX/bin:$PATH"',
+             f"cd {shlex.quote(lmms_dir)}"]
     if spec["needs_pp_parent"]:
         parts.append("export PYTHONPATH=$(dirname $(pwd)):$PYTHONPATH")
     parts.append(run)
