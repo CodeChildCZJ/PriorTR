@@ -345,7 +345,7 @@ class PrunableLlamaModel(LlamaModel):
                 # Update image_token_range for the next pruning layer
                 current_image_range = self._current_image_token_range = new_image_range
 
-                # Flash Attention 2 Mask 修正
+                # Flash Attention 2: drop the now-stale mask after pruning (FA2 builds its own causal mask)
                 if self._use_flash_attention_2:
                     attention_mask = None
 
