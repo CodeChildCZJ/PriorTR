@@ -53,6 +53,48 @@ The launcher translates unified flags into each subproject's own argument names
 (`strategy=` vs `vtr_strategy=`, `keep_tokens=` vs `vtr_keep_ratio=`, the
 `PYTHONPATH` / `attn_implementation=sdpa` quirks, etc.).
 
+## Method-specific hyperparameters
+
+Common knobs (`--keep-tokens` / `--keep-ratio` / `--prune-layer`) apply to every
+method. Each method *also* has its own hyperparameters, passed via repeatable
+`--param NAME=VALUE` and **validated against the chosen method** — e.g. giving
+`token_merge` to `priortr` is rejected, because only SparseVLM reads it.
+
+Discover what a combination accepts with `--describe`:
+
+```bash
+$ python vtr_run.py --describe qwen3vl priortr
+qwen3vl / priortr   (env: PriorTRqwen3vl, wrapper: qwen3_vl_vtr)
+  common knobs: --keep-tokens | --keep-ratio, --prune-layer
+  --param options for this method:
+    query_aggregation= {last|question|auto}  query attention aggregation
+    head_aggregation=  {mean|max}            aggregation across attention heads
+```
+
+```bash
+# tune priortr's attention aggregation
+python vtr_run.py --model qwen3vl --method priortr --tasks mme --keep-ratio 0.2222 \
+    --param query_aggregation=last --param head_aggregation=max
+
+# vispruner's importance/diversity split
+python vtr_run.py --model qwen3vl --method vispruner --tasks mme --keep-ratio 0.2222 \
+    --param important_ratio=0.6
+```
+
+Per-method tunables (run `--describe <model> <method>` for the authoritative list):
+
+| method | `--param` options |
+|---|---|
+| priortr / fastv | `query_aggregation`, `head_aggregation` |
+| sparsevlm | `token_merge` (defaults to `True`) |
+| vispruner | `important_ratio` (note: `prune_layer` is forced to 1 internally) |
+| internvl (any) | `max_num` (image tiles) |
+
+**Default *values* live in each subproject's own config** (single source of
+truth) — the launcher does not duplicate them. It only injects an *intended*
+default where it differs from the bare config default (currently just SparseVLM's
+`token_merge=True`); pass `--param token_merge=False` to override.
+
 ## Key flags
 
 | Flag | Meaning |
@@ -62,10 +104,12 @@ The launcher translates unified flags into each subproject's own argument names
 | `--tasks` | lmms-eval task list, comma-separated |
 | `--keep-tokens` / `--keep-ratio` | token budget (mutually exclusive) |
 | `--prune-layer` | pruning layer (subproject default if unset) |
+| `--param NAME=VALUE` | method-specific hyperparameter (repeatable, validated per method) |
+| `--describe MODEL METHOD` | list a combo's tunable hyperparameters and exit |
 | `--gpus` | `CUDA_VISIBLE_DEVICES` value |
-| `--num-processes` | `>1` uses `accelerate launch` for multi-GPU |
+| `--num-processes` | `>1` uses `accelerate launch` for multi-GPU eval throughput (speed only, not a hyperparameter) |
 | `--pretrained` | override the HF checkpoint |
-| `--extra` | raw extra `model_args`, appended verbatim |
+| `--extra` | raw extra `model_args`, appended verbatim (unvalidated escape hatch) |
 | `--dry-run` | print the command, don't execute |
 
 ## Prerequisites
