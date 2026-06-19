@@ -1,0 +1,25 @@
+# Core dependencies
+torch
+torchvision
+git+https://github.com/huggingface/transformers.git@f8f2834e1a
+accelerate
+qwen-vl-utils==0.0.14
+decord
+spacy
+
+# lmms-eval runtime dependencies (install after: pip install -e ./lmms-eval --no-deps)
+zstandard
+jiwer
+rouge_score
+nltk
+sacrebleu
+evaluate
+datasets
+loguru
+tenacity
+pycocoevalcap
+texttable
+protobuf
+sqlitedict
+openai
+pytablewriter

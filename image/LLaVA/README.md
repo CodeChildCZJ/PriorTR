@@ -41,8 +41,8 @@ The model now automatically prunes visual tokens during `model.generate()` — n
 ### Standard GPU (CUDA 12.4 or earlier)
 
 ```bash
-conda create -n llava python=3.10 -y
-conda activate llava
+conda create -n PriorTRllava python=3.10 -y
+conda activate PriorTRllava
 pip install -e .
 ```
 
@@ -53,8 +53,8 @@ This installs all dependencies from `pyproject.toml`, including `torch==2.1.2` w
 For GPUs that require CUDA 12.8 (e.g., Blackwell / RTX PRO series), install PyTorch separately and then install LLaVA without its pinned torch dependency:
 
 ```bash
-conda create -n llava python=3.10 -y
-conda activate llava
+conda create -n PriorTRllava python=3.10 -y
+conda activate PriorTRllava
 
 # 1. Install PyTorch with cu128
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
