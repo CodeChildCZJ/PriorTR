@@ -157,7 +157,7 @@ If you find PriorTR useful, please consider giving the repo a ⭐ and citing:
 ```bibtex
 @inproceedings{chen2026priortr,
     title     = {Accelerating Multimodal Large Language Models with Prior-Corrected Token Reduction},
-    author    = {Chen, Zengjie and Cai, Yuxiang and Guo, Jingcai and Cai, Taotao and Yin, Jianwei and Chen, Zhi},
+    author    = {Zengjie Chen and Yuxiang Cai and Jingcai Guo and Taotao Cai and Jianwei Yin and Zhi Chen},
     booktitle = {European Conference on Computer Vision (ECCV)},
     year      = {2026}
 }
