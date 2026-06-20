@@ -145,6 +145,11 @@ The runner translates unified flags into each subproject's own argument names. I
 differently, point it at them with `--env <name>` or an `envs.json` map — no code edits. Prefer the
 per-subproject README commands directly? Those still work; the runner is just a uniform front-end.
 
+> **Adding your own method?** The VTR framework is a plug-in strategy pattern — implement one
+> `compute_scores` class and register it, no model-code changes. See
+> [`docs/adding-a-method.md`](docs/adding-a-method.md) for the recipe (plus multi-layer pruning,
+> per-layer strategies, and cross-layer caching).
+
 ## 📜 Citation
 
 If you find PriorTR useful, please consider giving the repo a ⭐ and citing:
