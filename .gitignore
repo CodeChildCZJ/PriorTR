@@ -24,6 +24,7 @@ models--*/
 # Evaluation output
 eval_results/
 eval_test/
+output/
 *.jsonl
 
 # Logs

@@ -23,7 +23,9 @@ Default *values* are intentionally left to each subproject's own config (single
 source of truth) — the launcher only injects an "intended" default where it
 differs from the bare config default (e.g. SparseVLM token_merge=True).
 
-Note: Video-LLaVA is a separate subproject and is intentionally not wired in yet.
+Video-LLaVA dispatches through a second "native_video" backend (its own
+run_inference_video_qa.py, not lmms-eval): pass a video dataset via
+--video-dir/--gt-question/--gt-answers instead of --tasks.
 """
 
 import argparse
@@ -130,6 +132,31 @@ REGISTRY = {
                           "(~2x forward cost); prior_prompt/prior_mode use config defaults (not exposed here).",
         },
     },
+    # Video-LLaVA uses its OWN inference script (run_inference_video_qa.py), NOT
+    # lmms-eval — so it dispatches through the "native_video" backend, which takes
+    # a video dataset (--video-dir/--gt-question/--gt-answers) instead of --tasks.
+    # It has no single-forward priortr (video lacks the causal-mask shortcut).
+    "video-llava": {
+        "env": "PriorTRvideollava",
+        "subdir": "video/Video-LLaVA",
+        "backend": "native_video",
+        "model_path": "LanguageBind/Video-LLaVA-7B",
+        "script": "videollava/eval/video/run_inference_video_qa.py",
+        "methods": ["priortr_2f", "fastv", "baseline"],
+        "params": {
+            "query_aggregation": {"key": "vtr_query_aggregation", "methods": ["priortr_2f", "fastv"],
+                                  "choices": ["question", "last"],
+                                  "help": "query attention aggregation"},
+            "head_aggregation": {"key": "vtr_head_aggregation", "methods": ["priortr_2f", "fastv"],
+                                 "choices": ["mean", "max"],
+                                 "help": "aggregation across attention heads"},
+        },
+        "method_defaults": {},
+        "method_notes": {
+            "priortr_2f": "two-forward PriorTR (video has no causal-mask shortcut) — runs an extra "
+                          "question-free prior forward.",
+        },
+    },
 }
 
 # Methods that exist in some subprojects but are held back from the runner.
@@ -206,8 +233,8 @@ def print_capability_matrix():
         print(row + cells)
     if envs is None:
         print("\n(could not query conda envs — is conda on PATH?)")
-    print("\n(priortr_2f is the two-forward variant of PriorTR; Video-LLaVA is a separate "
-          "subproject not wired into this launcher.)")
+    print("\n(priortr_2f is the two-forward variant of PriorTR. Video-LLaVA runs via its own "
+          "inference script — pass --video-dir/--gt-question/--gt-answers instead of --tasks.)")
     print("Run `--describe <model> <method>` to see that combo's tunable hyperparameters.")
 
 
@@ -229,10 +256,18 @@ def describe(model, method):
               f"{', '.join(spec['methods'])}", file=sys.stderr)
         return 2
 
-    print(f"{model} / {method}   (env: {spec['env']}, wrapper: {spec['wrapper']})")
-    print(f"  default checkpoint: {spec['pretrained']}")
+    backend = spec.get("backend", "lmms_eval")
+    entry = spec.get("wrapper") or spec.get("script")
+    print(f"{model} / {method}   (env: {spec['env']}, "
+          f"{'wrapper' if backend == 'lmms_eval' else 'script'}: {entry})")
+    print(f"  default checkpoint: {spec.get('pretrained') or spec.get('model_path')}")
+    if backend == "native_video":
+        print("  native Video-LLaVA pipeline: needs --video-dir/--gt-question/--gt-answers "
+              "(no --tasks), --num-samples caps #QA.")
     if method == "baseline":
         print("  baseline = no pruning; only preprocessing params apply.")
+    elif backend == "native_video":
+        print("  common knobs: --keep-tokens, --prune-layer  (no --keep-ratio for video)")
     else:
         print("  common knobs: --keep-tokens | --keep-ratio, --prune-layer")
     mp = method_params(spec, method)
@@ -315,7 +350,46 @@ def default_output(model, method, args):
     return f"../eval_results/{model}_{tag}_{slug}"
 
 
+def build_native_video_command(model, spec, method, args, user_params):
+    """Video-LLaVA's own run_inference script (not lmms-eval): space-separated flags,
+    a video dataset (--video-dir/--gt-question/--gt-answers) instead of --tasks, and
+    baseline = simply omitting --vtr_enabled. Returns (inner_cmd, script_path)."""
+    work = os.path.join(REPO_ROOT, spec["subdir"])
+    script = spec["script"]
+    model_path = args.pretrained or spec["model_path"]
+    cache_dir = args.cache_dir or "./cache"  # required by the script's argparse but unused by loading
+    tag = "baseline" if method == "baseline" else (
+        f"{method}_k{args.keep_tokens}" if args.keep_tokens is not None else method)
+    ds = os.path.basename(os.path.dirname(args.video_dir.rstrip("/"))) or model
+    out_dir = args.output or f"output/{ds}_{tag}"
+
+    a = [f"--model_path {shlex.quote(model_path)}",
+         f"--cache_dir {shlex.quote(cache_dir)}",
+         f"--video_dir {shlex.quote(args.video_dir)}",
+         f"--gt_file_question {shlex.quote(args.gt_question)}",
+         f"--gt_file_answers {shlex.quote(args.gt_answers)}",
+         f"--output_dir {shlex.quote(out_dir)}",
+         "--output_name pred"]
+    if args.num_samples is not None:
+        a.append(f"--num_samples {args.num_samples}")
+    if method != "baseline":
+        a += ["--vtr_enabled", f"--vtr_strategy {method}"]
+        if args.keep_tokens is not None:
+            a.append(f"--vtr_keep_tokens {args.keep_tokens}")
+        if args.prune_layer is not None:
+            a.append(f"--vtr_prune_layer {args.prune_layer}")
+        for name, val in user_params.items():
+            a.append(f"--{spec['params'][name]['key']} {val}")
+    cuda = f"CUDA_VISIBLE_DEVICES={args.gpus} " if args.gpus else ""
+    run = f"{cuda}python {script} " + " ".join(a)
+    parts = ['unset VIRTUAL_ENV', 'export PATH="$CONDA_PREFIX/bin:$PATH"',
+             f"cd {shlex.quote(work)}", run]
+    return " && ".join(parts), os.path.join(work, script)
+
+
 def build_inner_command(model, spec, method, args, user_params):
+    if spec.get("backend") == "native_video":
+        return build_native_video_command(model, spec, method, args, user_params)
     lmms_dir = os.path.join(REPO_ROOT, spec["subdir"], "lmms-eval")
     model_args = build_model_args(spec, method, args, user_params)
     output = args.output or default_output(model, method, args)
@@ -387,6 +461,17 @@ def main():
     p.add_argument("--output", default=None, help="Override --output_path.")
     p.add_argument("--extra", default=None,
                    help='Raw extra model_args appended verbatim (unvalidated escape hatch).')
+    # video-llava (native_video backend) only:
+    p.add_argument("--video-dir", default=None, dest="video_dir",
+                   help="(video-llava) directory of video files.")
+    p.add_argument("--gt-question", default=None, dest="gt_question",
+                   help="(video-llava) ground-truth questions JSON.")
+    p.add_argument("--gt-answers", default=None, dest="gt_answers",
+                   help="(video-llava) ground-truth answers JSON.")
+    p.add_argument("--num-samples", type=int, default=None, dest="num_samples",
+                   help="(video-llava) cap #QA samples (the native analogue of --limit).")
+    p.add_argument("--cache-dir", default=None, dest="cache_dir",
+                   help="(video-llava) value for the script's required --cache_dir.")
     p.add_argument("--dry-run", action="store_true", dest="dry_run",
                    help="Print the command without executing.")
     args = p.parse_args()
@@ -398,12 +483,13 @@ def main():
         return describe(args.describe[0], args.describe[1])
 
     # ---- validation ----
-    missing = [f for f in ("model", "method", "tasks") if getattr(args, f) is None]
+    missing = [f for f in ("model", "method") if getattr(args, f) is None]
     if missing:
         p.error("missing required: " + ", ".join("--" + m for m in missing)
                 + " (or use --list / --describe)")
 
     spec = REGISTRY[args.model]
+    backend = spec.get("backend", "lmms_eval")
     if args.method in DEFERRED_METHODS:
         print(f"error: method '{args.method}' is intentionally not wired into the runner yet "
               f"(handled separately later).", file=sys.stderr)
@@ -413,6 +499,19 @@ def main():
               file=sys.stderr)
         print(f"       supported: {', '.join(spec['methods'])}", file=sys.stderr)
         return 2
+
+    # Backend-specific required inputs: lmms-eval needs --tasks; native_video needs a dataset.
+    if backend == "lmms_eval":
+        if args.tasks is None:
+            p.error("--tasks is required for this model (e.g. --tasks mme)")
+    else:  # native_video (Video-LLaVA)
+        vmiss = [fl for f, fl in (("video_dir", "--video-dir"), ("gt_question", "--gt-question"),
+                                  ("gt_answers", "--gt-answers")) if getattr(args, f) is None]
+        if vmiss:
+            p.error(f"model '{args.model}' needs: " + ", ".join(vmiss))
+        if args.keep_ratio is not None:
+            p.error(f"model '{args.model}' supports --keep-tokens only (no --keep-ratio)")
+
     if args.keep_tokens is not None and args.keep_ratio is not None:
         p.error("pass only one of --keep-tokens / --keep-ratio")
 
@@ -431,7 +530,7 @@ def main():
               file=sys.stderr)
 
     env = resolve_env(args.model, spec, args.env, load_env_overrides())
-    inner, lmms_dir = build_inner_command(args.model, spec, args.method, args, user_params)
+    inner, dep_path = build_inner_command(args.model, spec, args.method, args, user_params)
 
     print(f"# model={args.model}  method={args.method}  env={env}")
     print(f"# conda run -n {env} bash -lc '{inner}'")
@@ -449,9 +548,15 @@ def main():
         if not args.dry_run:
             return 4
 
-    if not os.path.isdir(lmms_dir):
-        print(f"\nwarning: {lmms_dir} not found — clone lmms-eval there per the subproject "
+    # Dependency preflight: lmms-eval clone (a dir) vs the native inference script (a file).
+    if backend == "lmms_eval" and not os.path.isdir(dep_path):
+        print(f"\nwarning: {dep_path} not found — clone lmms-eval there per the subproject "
               f"README before running for real.", file=sys.stderr)
+        if not args.dry_run:
+            return 3
+    elif backend == "native_video" and not os.path.isfile(dep_path):
+        print(f"\nwarning: {dep_path} not found — the Video-LLaVA inference script is missing.",
+              file=sys.stderr)
         if not args.dry_run:
             return 3
 

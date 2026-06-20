@@ -16,20 +16,24 @@ the launcher just gives it a single, uniform front-end.
 ## Capability matrix
 
 ```
-model     env                 priortr  priortr_2f  fastv  sparsevlm  vispruner  baseline
-llava     PriorTRllava           ✓                                                  ✓
-internvl  PriorTRinternvl        ✓                  ✓                               ✓
-qwen3vl   PriorTRqwen3vl         ✓         ✓        ✓        ✓          ✓           ✓
+model        env                 priortr  priortr_2f  fastv  sparsevlm  vispruner  baseline
+llava        PriorTRllava           ✓                                                  ✓
+internvl     PriorTRinternvl        ✓                  ✓                               ✓
+qwen3vl      PriorTRqwen3vl         ✓         ✓        ✓        ✓          ✓           ✓
+video-llava  PriorTRvideollava                ✓        ✓                               ✓
 ```
 
 Run `python vtr_run.py --list` to print it. Illegal combinations (e.g.
 `--model llava --method fastv`) are rejected with the supported list.
 
 `priortr_2f` is the **two-forward variant of PriorTR** (explicit question-free prior
-forward instead of the single-forward causal-mask shortcut); only Qwen3-VL implements it.
+forward instead of the single-forward causal-mask shortcut). Qwen3-VL and Video-LLaVA
+implement it; Video-LLaVA has **no single-forward `priortr`** (video lacks the causal-mask shortcut).
 
-> **Video-LLaVA** is a separate subproject (its own non-lmms-eval pipeline) and is
-> intentionally not wired into this launcher yet.
+> **Video-LLaVA** dispatches through a second **`native_video`** backend: it runs its own
+> `run_inference_video_qa.py` (not lmms-eval), so you pass a video dataset via
+> `--video-dir` / `--gt-question` / `--gt-answers` instead of `--tasks`, and `--num-samples`
+> caps the QA count. `--keep-ratio` is not supported (the script takes `--vtr_keep_tokens`).
 
 ## Usage
 
@@ -47,6 +51,14 @@ python vtr_run.py --model internvl --method fastv --tasks mme \
 
 # Baseline (no pruning) on LLaVA
 python vtr_run.py --model llava --method baseline --tasks pope --gpus 0
+
+# PriorTR-2F on Video-LLaVA (native backend: a video dataset, not --tasks)
+python vtr_run.py --model video-llava --method priortr_2f \
+    --video-dir /data/MSVD_Zero_Shot_QA/videos \
+    --gt-question /data/MSVD_Zero_Shot_QA/test_q.json \
+    --gt-answers  /data/MSVD_Zero_Shot_QA/test_a.json \
+    --keep-tokens 64 --prune-layer 3 --param query_aggregation=question \
+    --num-samples 500 --gpus 0
 
 # Inspect the exact command without running it
 python vtr_run.py --model qwen3vl --method priortr --tasks mme --keep-ratio 0.2222 --dry-run
@@ -103,19 +115,24 @@ default where it differs from the bare config default (currently just SparseVLM'
 
 | Flag | Meaning |
 |---|---|
-| `--model` | `llava` \| `internvl` \| `qwen3vl` |
+| `--model` | `llava` \| `internvl` \| `qwen3vl` \| `video-llava` |
 | `--method` | `priortr` \| `priortr_2f` \| `fastv` \| `sparsevlm` \| `vispruner` \| `baseline` (per matrix) |
-| `--tasks` | lmms-eval task list, comma-separated |
-| `--keep-tokens` / `--keep-ratio` | token budget (mutually exclusive) |
+| `--tasks` | lmms-eval task list, comma-separated (image models) |
+| `--keep-tokens` / `--keep-ratio` | token budget (mutually exclusive; video-llava: `--keep-tokens` only) |
 | `--prune-layer` | pruning layer (subproject default if unset) |
 | `--param NAME=VALUE` | method-specific hyperparameter (repeatable, validated per method) |
 | `--describe MODEL METHOD` | list a combo's tunable hyperparameters and exit |
 | `--gpus` | `CUDA_VISIBLE_DEVICES` value |
-| `--num-processes` | `>1` uses `accelerate launch` for multi-GPU eval throughput (speed only, not a hyperparameter) |
+| `--num-processes` | `>1` uses `accelerate launch` for multi-GPU eval throughput (image models; speed only) |
 | `--env` | override the conda env name for `--model` (else `envs.json`, else the default) |
 | `--pretrained` | override the HF checkpoint |
 | `--extra` | raw extra `model_args`, appended verbatim (unvalidated escape hatch) |
 | `--limit N` | lmms-eval `--limit`: cap #samples (int) or fraction — handy for smoke tests |
+| **video-llava only:** | (native_video backend) |
+| `--video-dir` | directory of video files |
+| `--gt-question` / `--gt-answers` | ground-truth questions / answers JSON |
+| `--num-samples N` | cap #QA samples (the native analogue of `--limit`) |
+| `--cache-dir` | value for the script's required `--cache_dir` |
 | `--dry-run` | print the command, don't execute |
 
 ## Environments (how dispatch finds them)
