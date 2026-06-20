@@ -1,16 +1,18 @@
-# PriorTR-2F on Video-LLaVA
+<div align="center">
+<h2>PriorTR-2F on Video-LLaVA</h2>
+<p><b>Two-forward V-Information visual token pruning for video.</b> A <b>prior forward</b> (empty prompt) then a <b>task forward</b> (the real question); score by <code>S = P · log(P / Q)</code> and keep the tokens carrying task-specific information beyond the prior. Video lacks the single-forward causal-mask shortcut, hence two forwards.</p>
+<p>
+  <img src="https://img.shields.io/badge/conda-PriorTRvideollava-44A833?logo=anaconda&logoColor=white" alt="env">
+  <img src="https://img.shields.io/badge/transformers-4.37.2-FFD21E?logo=huggingface&logoColor=black" alt="transformers">
+  <img src="https://img.shields.io/badge/methods-PriorTR--2F%20%7C%20FastV-3776AB" alt="methods">
+</p>
+</div>
 
-Visual token pruning for **video** understanding. **PriorTR-2F is the two-forward variant of PriorTR**:
-identical task attention `P` and score `S = P · log(P / Q)`, but the prior `Q` comes from an explicit
-**prior forward** (empty/generic prompt) followed by a **task forward** (the real question), instead of
-PriorTR's single-forward causal-mask shortcut — video models lack that shortcut. The score identifies
-visual tokens carrying task-specific information beyond the prior, and prunes the rest.
+> 🧩 Part of [**PriorTR**](../../README.md) · [unified runner](../../docs/RUNNER.md) · [add a method](../../docs/adding-a-method.md)
 
-> Part of [**PriorTR**](../../README.md) — see the [unified runner](../../docs/RUNNER.md) to launch any model × method with one CLI.
+## ⚙️ Environment Setup
 
-## Environment Setup
-
-### Standard GPU (CUDA 12.4 or earlier)
+**Standard GPU (CUDA 12.4 or earlier)**
 
 ```bash
 conda create -n PriorTRvideollava python=3.10 -y
@@ -18,10 +20,7 @@ conda activate PriorTRvideollava
 pip install -e .          # installs deps from pyproject.toml, incl. torch>=2.0.1 (cu121)
 ```
 
-### Newer GPU (SM_120+, CUDA 12.8)
-
-For Blackwell / RTX PRO series, install dependencies manually so the `torch>=2.0.1` pin does not pull
-an incompatible build:
+**Newer GPU (SM_120+, CUDA 12.8)** — Blackwell / RTX PRO: install deps manually so the `torch>=2.0.1` pin does not pull an incompatible build.
 
 ```bash
 conda create -n PriorTRvideollava python=3.10 -y
@@ -43,15 +42,14 @@ pip install "openai==0.28" "tensorboardX==2.6.2.2"
 pip install -e . --no-deps
 ```
 
-> **Note (numpy / scikit-learn):** cu128 torch wheels ship numpy 2.x. Do not pin
-> `scikit-learn==1.2.2` (its binaries are built against numpy 1.x and will segfault) — use unpinned
-> `scikit-learn`.
+> ⚠️ **numpy / scikit-learn:** cu128 torch wheels ship numpy 2.x. Do not pin `scikit-learn==1.2.2`
+> (its binaries are built against numpy 1.x and segfault) — use unpinned `scikit-learn`.
 
-> **Note (pytorchvideo patch, required for cu128 / recent torchvision):** recent torchvision removed
+> ⚠️ **pytorchvideo patch (required for cu128 / recent torchvision).** Recent torchvision removed
 > `torchvision.transforms.functional_tensor`, which `pytorchvideo/transforms/augmentations.py` imports,
-> so inference fails at import time. Apply this one-time patch (it locates the file via the **top-level**
-> `pytorchvideo` package — importing the `augmentations` submodule directly is the very import that
-> breaks):
+> so inference fails at import time. Apply this one-time patch (it locates the file via the
+> **top-level** `pytorchvideo` package — importing the `augmentations` submodule directly is the very
+> import that breaks):
 
 ```bash
 python - <<'PY'
@@ -68,7 +66,7 @@ else:
 PY
 ```
 
-**Verify:**
+**Verify**
 
 ```bash
 python -c "
@@ -79,7 +77,7 @@ print('VTR OK')
 "
 ```
 
-## Inference
+## 🚀 Inference
 
 Video-LLaVA ships its own inference pipeline (it does **not** use lmms-eval). Point `--video_dir`,
 `--gt_file_question`, and `--gt_file_answers` at your dataset (same script works for MSVD, MSRVTT, TGIF,
@@ -109,7 +107,7 @@ python $S --model_path $M --cache_dir ./cache \
     --vtr_enabled --vtr_strategy fastv --vtr_prune_layer 3 --vtr_keep_tokens 64
 ```
 
-## GPT Evaluation
+## 📊 GPT Evaluation
 
 After inference, score predictions with the GPT-based evaluator (requires an OpenAI key):
 
@@ -122,24 +120,24 @@ python videollava/eval/video/eval_video_qa.py \
     --model gpt-3.5-turbo --num_tasks 4
 ```
 
-This reports accuracy and average score (0–5) against the ground truth.
+Reports accuracy and average score (0–5) against the ground truth.
 
-## VTR Parameters
+## 🎛️ VTR Parameters
 
 | Parameter | CLI Flag | Default | Description |
-|---|---|---|---|
+|---|---|:---:|---|
 | enabled | `--vtr_enabled` | `False` | Enable visual token reduction |
 | strategy | `--vtr_strategy` | `priortr_2f` | `priortr_2f` or `fastv` |
 | prune_layer | `--vtr_prune_layer` | `3` | LLM layer index at which to prune |
 | keep_tokens | `--vtr_keep_tokens` | `194` | Number of visual tokens to keep |
-| keep_ratio | (config only) | `0.25` | Fraction to keep (ignored when keep_tokens is set) |
+| keep_ratio | *(config only)* | `0.25` | Fraction to keep (ignored when keep_tokens is set) |
 | query_aggregation | `--vtr_query_aggregation` | `question` | `question` (all question tokens) or `last` (last token) |
-| head_aggregation | `--vtr_head_aggregation` | `mean` | aggregate across heads: `mean` or `max` |
-| prior_prompt | (config only) | `""` | prompt for the prior forward (PriorTR-2F only) |
-| score_threshold | (config only) | `None` | keep tokens above this V-Info score (PriorTR-2F only) |
-| adaptive_layer | (config only) | `False` | adaptive layer selection across candidates (PriorTR-2F only) |
+| head_aggregation | `--vtr_head_aggregation` | `mean` | Aggregate across heads: `mean` or `max` |
+| prior_prompt | *(config only)* | `""` | Prompt for the prior forward (PriorTR-2F only) |
+| score_threshold | *(config only)* | `None` | Keep tokens above this V-Info score (PriorTR-2F only) |
+| adaptive_layer | *(config only)* | `False` | Adaptive layer selection across candidates (PriorTR-2F only) |
 
-## License
+## 📄 License
 
 Built on [Video-LLaVA](https://github.com/PKU-YuanGroup/Video-LLaVA); released under the Apache 2.0
-License (see the root [LICENSE](../../LICENSE)).
+License (root [LICENSE](../../LICENSE)).

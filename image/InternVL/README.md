@@ -1,13 +1,16 @@
-# PriorTR on InternVL2.5
+<div align="center">
+<h2>PriorTR on InternVL2.5</h2>
+<p><b>Single-forward V-Information visual token pruning.</b> Estimate the model's prior from causal attention and rank visual tokens by <code>S = P · log(P / Q)</code> — no extra prior forward. A <b>FastV</b> baseline is included under the same framework.</p>
+<p>
+  <img src="https://img.shields.io/badge/conda-PriorTRinternvl-44A833?logo=anaconda&logoColor=white" alt="env">
+  <img src="https://img.shields.io/badge/transformers-%E2%89%A44.49.0-FFD21E?logo=huggingface&logoColor=black" alt="transformers">
+  <img src="https://img.shields.io/badge/methods-PriorTR%20%7C%20FastV-3776AB" alt="methods">
+</p>
+</div>
 
-Visual token pruning for **InternVL2.5** using **PriorTR**. PriorTR exploits the causal attention
-structure to estimate the model's inherent prior in a **single forward pass**, scoring visual tokens
-by V-Information `S = P · log(P / Q)` — no extra prior forward needed. A **FastV** baseline is included
-under the same VTR framework.
+> 🧩 Part of [**PriorTR**](../../README.md) · [unified runner](../../docs/RUNNER.md) · [add a method](../../docs/adding-a-method.md)
 
-> Part of [**PriorTR**](../../README.md) — see the [unified runner](../../docs/RUNNER.md) to launch any model × method with one CLI.
-
-## Environment Setup
+## ⚙️ Environment Setup
 
 ```bash
 conda create -n PriorTRinternvl python=3.10 -y
@@ -20,19 +23,17 @@ pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 pip install -r requirements.txt
 ```
 
-> **Why `transformers <= 4.49`?** InternVL2.5 loads custom model code (InternLM2 backbone) via
+> ⚠️ **Why `transformers <= 4.49`?** InternVL2.5 loads custom code (InternLM2 backbone) via
 > `trust_remote_code=True`. From transformers 4.50+, `GenerationMixin` was refactored out of
 > `PreTrainedModel`, so `InternLM2ForCausalLM.generate()` disappears. Always use `transformers <= 4.49.0`.
 
-**Verify:**
+**Verify**
 
 ```bash
 python -c "import torch, transformers; print(torch.__version__, transformers.__version__); from internvl_vtr.config import VTRConfig; print('InternVL VTR OK')"
 ```
 
-## lmms-eval Setup
-
-[lmms-eval](https://github.com/EvolvingLMMs-Lab/lmms-eval) drives benchmark evaluation:
+## 📦 lmms-eval Setup
 
 ```bash
 git clone https://github.com/EvolvingLMMs-Lab/lmms-eval.git
@@ -49,9 +50,9 @@ cp ./lmms_eval_model/internvl_vtr.py ./lmms-eval/lmms_eval/models/simple/internv
 Then add `"internvl_vtr": "InternVLVTR",` to `AVAILABLE_SIMPLE_MODELS` in
 `./lmms-eval/lmms_eval/models/__init__.py`.
 
-## Usage
+## 🚀 Usage
 
-Run from the `lmms-eval/` directory (export `PYTHONPATH` so the wrapper can import `internvl_vtr`):
+Run from `lmms-eval/` (export `PYTHONPATH` so the wrapper can import `internvl_vtr`):
 
 ```bash
 cd lmms-eval
@@ -84,19 +85,19 @@ accelerate launch --num_processes=5 --main_process_port=29500 -m lmms_eval --mod
     --tasks mme --batch_size 1 --output_path ../eval_results/priortr_128_l2
 ```
 
-## VTR Parameters
+## 🎛️ VTR Parameters
 
 Passed via `--model_args` as comma-separated `key=value` pairs.
 
 | Parameter | Type | Default | Description |
-|---|---|---|---|
+|---|:---:|:---:|---|
 | `strategy` | str | `baseline` | `priortr`, `fastv`, or `baseline` (no pruning) |
 | `keep_tokens` | int | — | Exact tokens to keep (overrides `keep_ratio`) |
 | `keep_ratio` | float | `0.25` | Fraction to keep (used when `keep_tokens` is unset) |
 | `prune_layer` | int | `2` | Layer at which to prune (1-indexed) |
 | `max_num` | int | `6` | Max image tiles for dynamic resolution |
 
-## License
+## 📄 License
 
-Built on [InternVL2.5](https://github.com/OpenGVLab/InternVL); released under the MIT License
-(the PriorTR-specific code follows the repo's root [LICENSE](../../LICENSE)).
+Built on [InternVL2.5](https://github.com/OpenGVLab/InternVL) (MIT); the PriorTR-specific code follows
+the root [LICENSE](../../LICENSE).
