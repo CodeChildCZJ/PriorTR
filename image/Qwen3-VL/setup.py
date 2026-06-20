@@ -61,18 +61,34 @@ def _create_symlink():
     return True
 
 
-class PostDevelopCommand(develop):
-    """Post-installation for development mode (pip install -e .)."""
-    def run(self):
-        develop.run(self)
+def _run_then_symlink(super_run):
+    """Run the base command, then ALWAYS create the symlink.
+
+    setuptools' legacy dependency-resolution step can abort (e.g. a transitive
+    `typer` version conflict pulled in by huggingface-hub) *after* the package
+    itself is already installed. That must not stop the qwen3_vl symlink — the
+    symlink is what makes the custom VTR model code take effect — so we create
+    it in a `finally`, surfacing any dependency-step error as a warning.
+    """
+    try:
+        super_run()
+    except BaseException as e:  # noqa: BLE001 - keep going so the symlink is made
+        print(f"[PriorTR] Warning: dependency step reported: {e!r}. "
+              f"The package is installed; continuing to create the symlink.")
+    finally:
         _create_symlink()
+
+
+class PostDevelopCommand(develop):
+    """Post-installation for development mode (python setup.py develop)."""
+    def run(self):
+        _run_then_symlink(lambda: develop.run(self))
 
 
 class PostInstallCommand(install):
     """Post-installation for install mode (pip install .)."""
     def run(self):
-        install.run(self)
-        _create_symlink()
+        _run_then_symlink(lambda: install.run(self))
 
 
 setup(

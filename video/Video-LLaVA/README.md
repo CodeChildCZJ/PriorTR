@@ -51,18 +51,26 @@ pip install -e . --no-deps
 Do not pin `scikit-learn==1.2.2` -- its pre-built binaries are compiled against
 numpy 1.x and will segfault. Use an unpinned `scikit-learn` instead.
 
-**Note on pytorchvideo:** Newer torchvision removes the
-`torchvision.transforms.functional_tensor` module. If you see an import error,
-patch `pytorchvideo/transforms/augmentations.py` line 9:
+**Note on pytorchvideo (required for cu128 / recent torchvision):** Recent
+torchvision removes the `torchvision.transforms.functional_tensor` module that
+`pytorchvideo/transforms/augmentations.py` imports, so the inference script fails
+at import time. Apply this one-time patch after installing. It locates the file via
+the **top-level** `pytorchvideo` package (importing the `augmentations` submodule
+directly is exactly the import that breaks, so don't use that to find it):
 
-```python
-# replace:
-import torchvision.transforms.functional_tensor as F_t
-# with:
-try:
-    import torchvision.transforms.functional_tensor as F_t
-except ModuleNotFoundError:
-    import torchvision.transforms._functional_tensor as F_t
+```bash
+python - <<'PY'
+import os, pytorchvideo
+f = os.path.join(os.path.dirname(pytorchvideo.__file__), "transforms", "augmentations.py")
+s = open(f).read()
+old = "import torchvision.transforms.functional_tensor as F_t"
+new = ("try:\n    import torchvision.transforms.functional_tensor as F_t\n"
+       "except ModuleNotFoundError:\n    import torchvision.transforms._functional_tensor as F_t")
+if "except ModuleNotFoundError" not in s and old in s:
+    open(f, "w").write(s.replace(old, new)); print("patched:", f)
+else:
+    print("already patched / nothing to do")
+PY
 ```
 
 ## Inference
