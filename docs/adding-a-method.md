@@ -148,6 +148,6 @@ existing strategy there rather than extending LLaVA's minimal framework.
 ## Note: the per-model frameworks are parallel copies
 
 Each model ships its own VTR framework (`llava/vtr`, `internvl_vtr`, `visual_token_pruning`,
-`videollava/vtr`) — they are not yet a shared core. A strategy added to LLaVA only affects LLaVA; to
-support several backbones, drop an equivalent strategy file into each (the interfaces are nearly
-identical). A model-agnostic `vtr-core` extraction is planned for after publication.
+`videollava/vtr`) — independent copies, not a shared core. A strategy added to LLaVA only affects
+LLaVA; to support several backbones, drop an equivalent strategy file into each (the interfaces are
+nearly identical).
