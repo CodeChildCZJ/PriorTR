@@ -35,6 +35,12 @@
 > within a **single** forward pass) and ranks tokens by V-Information `S = P · log(P / Q)`. It is
 > **training-free** and works across image and video MLLMs.
 
+## 📜 News
+
+- **[2026-06-20]** 🎉 Code released — PriorTR across LLaVA-1.5, InternVL2.5, Qwen3-VL, and Video-LLaVA, with a unified runner.
+- **[2026-06-18]** 🎉 PriorTR is accepted to **ECCV 2026**!
+- **[coming soon]** 📄 arXiv preprint.
+
 ## 📖 Introduction
 
 Visual token reduction accelerates Multimodal Large Language Models (MLLMs) by pruning redundant image
