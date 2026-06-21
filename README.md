@@ -8,11 +8,11 @@
 
 <p align="center">
   Zengjie Chen<sup>1,2</sup>,
-  Yuxiang Cai<sup>1,2,*</sup>,
-  Jingcai Guo<sup>3</sup>,
+  <a href="https://yuxiangcai.github.io/">Yuxiang Cai</a><sup>1,2,*</sup>,
+  <a href="https://jingcaiguo.github.io/">Jingcai Guo</a><sup>3</sup>,
   Taotao Cai<sup>4</sup>,
-  Jianwei Yin<sup>1,2</sup>,
-  Zhi Chen<sup>4,*</sup>
+  <a href="https://person.zju.edu.cn/en/0001038">Jianwei Yin</a><sup>1,2</sup>,
+  <a href="https://uqzhichen.github.io/">Zhi Chen</a><sup>4,*</sup>
 </p>
 
 <p align="center">
@@ -27,13 +27,15 @@
   <a href="#"><img src="https://img.shields.io/badge/arXiv-coming%20soon-b31b1b.svg" alt="arXiv"></a>
   <a href="https://github.com/CodeChildCZJ/PriorTR"><img src="https://img.shields.io/badge/Code-PriorTR-181717.svg?logo=github" alt="Code"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License"></a>
+  <a href="https://github.com/CodeChildCZJ/PriorTR/stargazers"><img src="https://img.shields.io/github/stars/CodeChildCZJ/PriorTR?style=social" alt="GitHub stars"></a>
 </p>
 
 > **TL;DR** — Attention-based visual token pruning is dominated by a **model-induced prior**: an MLLM
 > attends to certain regions even with no instruction. PriorTR corrects this by contrasting the
 > task-conditioned attention `P` with an instruction-agnostic prior `Q` (estimated from a null token
 > within a **single** forward pass) and ranks tokens by V-Information `S = P · log(P / Q)`. It is
-> **training-free** and works across image and video MLLMs.
+> **training-free**, keeps **99.5%** of full accuracy at **1/3** of the tokens (and **94.5%** at
+> **1/9**), and works across image and video MLLMs.
 
 ## 📜 News
 
@@ -71,22 +73,27 @@ tokens are **physically retained** so every subsequent layer operates on a short
 
 ## 📊 Results
 
-Average performance across **12 benchmarks** on **LLaVA-1.5-7B** (normalized to the 576-token upper
-bound). PriorTR consistently leads, with the largest margin under tight token budgets.
+Average performance across **12 benchmarks** on **LLaVA-1.5-7B** — GQA, POPE, MME, MMB, TextVQA,
+SEED, VizWiz, SQA, Flickr, NoCaps, OKVQA, MMVet — normalized to the **576-token vanilla model (100%)**.
+PriorTR consistently leads, with the largest margin under the tightest token budgets.
 
-| Visual tokens | Reduction | FastV | SparseVLM | VisPruner | **PriorTR (Ours)** |
-|:---:|:---:|:---:|:---:|:---:|:---:|
-| 576 (full) | – | – | – | – | 100.0 |
-| 192 | ↓ 66.7% | 89.8 | 97.4 | 98.5 | **99.5** |
-| 128 | ↓ 77.8% | 85.1 | 91.2 | 96.6 | **98.2** |
-| 64 | ↓ 88.9% | 70.7 | 81.4 | 91.7 | **94.5** |
+| Method | Venue | 192 tok (↓66.7%) | 128 tok (↓77.8%) | 64 tok (↓88.9%) |
+|:---|:---:|:---:|:---:|:---:|
+| *Vanilla (576 tok)* | – | *100.0* | *100.0* | *100.0* |
+| FastV | ECCV'24 | 89.8 | 85.1 | 70.7 |
+| PDrop | CVPR'25 | 96.0 | 92.7 | 74.4 |
+| SparseVLM | ICML'25 | 97.4 | 91.2 | 81.4 |
+| PruMerge | ICCV'25 | 89.1 | 85.3 | 83.0 |
+| VisPruner | ICCV'25 | 98.5 | 96.6 | 91.7 |
+| **PriorTR (Ours)** | **ECCV'26** | **99.5** | **98.2** | **94.5** |
 
 <p align="center">
   <img src="assets/spider.png" width="92%" alt="Radar comparison under 64 / 128 / 192 token budgets">
 </p>
 
-PriorTR covers the largest area across benchmarks at every budget. See the
-[paper](#) for full per-benchmark tables, video results, and ablations.
+Values are the averaged normalized score (%); best in **bold**. PriorTR covers the largest area across
+benchmarks at every budget. See the [paper](#) for full per-benchmark tables, video (Video-LLaVA)
+results, and ablations.
 
 ## 🗂️ Supported Models
 
@@ -155,6 +162,35 @@ per-subproject README commands directly? Those still work; the runner is just a 
 > `compute_scores` class and register it, no model-code changes. See
 > [`docs/adding-a-method.md`](docs/adding-a-method.md) for the recipe (plus multi-layer pruning,
 > per-layer strategies, and cross-layer caching).
+
+## 📁 Repository Structure
+
+```
+PriorTR/
+├── vtr_run.py                     # ⭐ unified launcher — any model × method via one CLI
+├── assets/                        # README figures (framework / intro / spider)
+├── docs/
+│   ├── RUNNER.md                  #   launcher reference: flags, capability matrix, --param
+│   └── adding-a-method.md         #   recipe for plugging in a new pruning strategy
+├── image/
+│   ├── LLaVA/                     # PriorTR on LLaVA-1.5      (transformers 4.37.2)
+│   │   └── llava/vtr/             #   └ VTR framework
+│   │       ├── strategy/          #       compute_scores() per method (priortr.py, …)
+│   │       ├── model/             #       prunable decoder hook (prunable_llama.py)
+│   │       └── config.py          #       VTRConfig (keep_tokens / prune_layer / …)
+│   ├── InternVL/                  # PriorTR on InternVL2.5    (transformers ≤4.49)
+│   │   └── internvl_vtr/          #   └ same strategy-pattern framework
+│   └── Qwen3-VL/                  # PriorTR + method zoo      (pinned transformers commit)
+│       └── visual_token_pruning/  #   └ priortr · priortr_2f · fastv · sparsevlm · vispruner
+├── video/
+│   └── Video-LLaVA/               # PriorTR-2F on Video-LLaVA (video)
+│       └── videollava/vtr/        #   └ VTR framework (video)
+└── LICENSE
+```
+
+Each model ships its **own** copy of the VTR framework — incompatible `transformers` pins keep them
+isolated — but the strategy pattern is identical across all four. To add a method, implement one
+`compute_scores` class and register it; see [`docs/adding-a-method.md`](docs/adding-a-method.md).
 
 ## 📜 Citation
 
