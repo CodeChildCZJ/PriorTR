@@ -23,6 +23,7 @@ from .priortr_2f import PriorTR2FStrategy
 from .priortr import PriorTRStrategy
 from .sparsevlm import SparseVLMStrategy
 from .vispruner import VisPrunerStrategy
+from .clse import CLSEStrategy
 
 __all__ = [
     "VTRStrategy",
@@ -31,4 +32,5 @@ __all__ = [
     "PriorTRStrategy",
     "SparseVLMStrategy",
     "VisPrunerStrategy",
+    "CLSEStrategy",
 ]

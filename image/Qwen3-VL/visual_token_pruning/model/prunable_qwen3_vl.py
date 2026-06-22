@@ -459,6 +459,10 @@ class PrunableQwen3VLTextModel(Qwen3VLTextModel):
 
         # Filter keys that conflict with positional args of compute_scores
         score_context = {k: v for k, v in vtr_context.items() if k != "image_token_range"}
+        # [CLSE] route the current layer features (z_Lk) to feature-based strategies.
+        # Kept local to score_context so it does not leak into the post_prune hook
+        # (whose first positional arg is also named hidden_states).
+        score_context["hidden_states"] = hidden_states
         scores = vtr_strategy.compute_scores(
             attention_weights, image_token_range, vtr_config, layer_idx=prune_step, **score_context
         )

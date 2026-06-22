@@ -38,7 +38,12 @@ class VTRConfig:
     # query_aggregation: None means auto (set by setup_vtr based on model version: 1.5→question, 1.6→last)
     query_aggregation: Optional[str] = None    # None(auto) / last / question
     head_aggregation: str = "mean"              # mean / max
-    
+
+    # [CLSE] Layers at which to snapshot reference image features into vtr_ctx["z_ref"]
+    # for cross-layer (spectral-evolution) scoring. Empty = no snapshot (default; other
+    # strategies are unaffected).
+    ref_layers: List[int] = field(default_factory=list)
+
     def __post_init__(self) -> None:
         """Validate configuration parameters."""
         # Convert single prune_layer to list for unified handling
@@ -92,6 +97,7 @@ class VTRConfig:
             "keep_tokens": self.keep_tokens,
             "query_aggregation": self.query_aggregation,
             "head_aggregation": self.head_aggregation,
+            "ref_layers": self.ref_layers,
         }
 
     @classmethod

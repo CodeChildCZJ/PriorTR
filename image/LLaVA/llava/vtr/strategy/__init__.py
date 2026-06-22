@@ -2,6 +2,7 @@
 from .base import PruningStrategy
 from .registry import VTR_REGISTRY, register_strategy, get_strategy
 from .priortr import PriorTRStrategy
+from .clse import CLSEStrategy
 
 __all__ = [
     "PruningStrategy",
@@ -9,4 +10,5 @@ __all__ = [
     "register_strategy",
     "get_strategy",
     "PriorTRStrategy",
+    "CLSEStrategy",
 ]

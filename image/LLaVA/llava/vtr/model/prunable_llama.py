@@ -268,7 +268,16 @@ class PrunableLlamaModel(LlamaModel):
                 all_hidden_states += (hidden_states,)
 
             layer_idx = decoder_layer.self_attn.layer_idx
-            
+
+            # [CLSE] Snapshot reference image features at ref_layers (e.g. layer 0, before this
+            # layer runs) into the shared vtr_ctx, for cross-layer spectral-evolution scoring.
+            # Empty ref_layers (the default) makes this a no-op for other strategies.
+            if should_prune and current_image_range is not None:
+                _ref_layers = getattr(self._vtr_config, "ref_layers", None) or []
+                if layer_idx in _ref_layers:
+                    _rs, _re = current_image_range
+                    vtr_ctx["z_ref"] = hidden_states[:, _rs:_re, :]
+
             # Check if attention is needed at this layer (layer K-1)
             need_attention_for_pruning = should_prune and layer_idx in prune_layer_set
             layer_output_attentions = output_attentions or need_attention_for_pruning
@@ -329,6 +338,9 @@ class PrunableLlamaModel(LlamaModel):
                     else:
                         raise ValueError("Attention weights are None but pruning is requested.")
                 
+                # [CLSE] expose the current layer index (K-1) so stage-aware strategies can
+                # determine which progressive pruning stage they are in.
+                vtr_ctx["layer_idx"] = layer_idx
                 # Execute full pruning (past_key_values already contains K-1 layer's kv at this point)
                 hidden_states, position_ids, attention_mask, past_key_values, new_seq_len, new_image_range = \
                     self._compute_and_apply_pruning(
@@ -410,6 +422,10 @@ class PrunableLlamaModel(LlamaModel):
         if num_img_tokens <= 0:
             return hidden_states, position_ids, attention_mask, past_key_values, seq_length, image_token_range
         
+        # [CLSE] Route the layer's hidden states to feature-based strategies
+        # (per docs/adding-a-method.md). Attention-only strategies simply ignore it.
+        vtr_ctx["hidden_states"] = hidden_states
+
         # Step 1: Compute scores
         scores = self._vtr_strategy.compute_scores(
             attention_weights,

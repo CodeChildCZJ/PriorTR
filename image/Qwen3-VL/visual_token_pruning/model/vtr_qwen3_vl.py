@@ -103,10 +103,13 @@ class VTRQwen3VLForConditionalGeneration(Qwen3VLForConditionalGeneration):
         elif strategy_name == "vispruner":
             from ..strategy.vispruner import VisPrunerStrategy
             return VisPrunerStrategy()
+        elif strategy_name == "clse":
+            from ..strategy.clse import CLSEStrategy
+            return CLSEStrategy()
         else:
             raise ValueError(
                 f"Unknown VTR strategy: '{strategy_name}'. "
-                f"Must be one of: 'fastv', 'priortr_2f', 'sparsevlm', 'priortr', 'vispruner'"
+                f"Must be one of: 'fastv', 'priortr_2f', 'sparsevlm', 'priortr', 'vispruner', 'clse'"
             )
 
     def _replace_text_model(self) -> None:
@@ -189,6 +192,13 @@ class VTRQwen3VLForConditionalGeneration(Qwen3VLForConditionalGeneration):
             'prior_attention' tensor with shape [num_image_tokens].
         """
         vtr_context: Dict = {"image_token_range": image_token_range}
+
+        # [CLSE] expose the post-merge visual grid (h, w) so spectral-evolution scoring can
+        # reshape image-token features back to 2D for the FFT (single-image case).
+        if image_grid_thw is not None and len(image_grid_thw) >= 1:
+            sm = self.config.vision_config.spatial_merge_size
+            _t, _h, _w = (int(v) for v in image_grid_thw[0].tolist())
+            vtr_context["grid_hw"] = (_h // sm, _w // sm)
 
         if self.vtr_config.strategy == "priortr_2f":
             prior_input_ids = build_prior_input(
