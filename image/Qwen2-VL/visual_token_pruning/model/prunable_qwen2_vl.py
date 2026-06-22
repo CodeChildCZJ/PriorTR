@@ -1,13 +1,20 @@
 """Prunable Qwen2-VL text model with strategy-pattern visual token reduction.
 
-This mirrors the Qwen3-VL ``prunable_qwen3_vl`` design but targets Qwen2-VL
-(transformers 4.57.x). The pruning *mechanics* (visual-range detection via the
-visual position mask, reference-feature snapshot at L_list=[0], progressive
-multi-stage pruning at K_list, and the last-text-token attention capture) are kept
-faithful to the original CLSE Qwen2-VL implementation so that the CLSE strategy
-reproduces the original numbers exactly. Only the *scoring* and the *keep count*
-are delegated to the pluggable strategy / config, so PriorTR, FastV and CLSE all
-share one model.
+This mirrors the Qwen3-VL ``prunable_qwen3_vl`` *generic* (prunable-base) design,
+targeting Qwen2-VL (transformers 4.53.x). The visual-range detection, reference
+snapshot at L_list=[0], progressive multi-stage pruning at K_list, and the
+attention capture are shared; scoring and keep-count are delegated to the
+pluggable strategy / config, so PriorTR, FastV and CLSE all share one model.
+
+Generic (Qwen3-VL) convention — two deliberate differences from the byte-exact
+CLSE replica that previously lived here (see git ``ca1c48c`` for the replica):
+  1. The keep ratio is applied to the *current* surviving visual-token count
+     (ratio-of-current), not the original visual length (ratio-of-original).
+  2. The KV cache of every already-computed layer is trimmed at each prune step so
+     all layers carry the same pruned sequence (standard handling); the byte-exact
+     replica left the cache untrimmed / ragged to reproduce the original numbers.
+These two changes are exactly what isolates "what does using the standard
+framework convention cost" relative to the original CLSE-Qwen2-VL.
 """
 
 from typing import Any, Dict, Optional, Tuple, Union
@@ -148,7 +155,6 @@ class PrunableQwen2VLTextModel(Qwen2VLTextModel):
         # using attention captured one layer earlier (k-1). ref features at L_list (default [0]).
         ref_layers = getattr(vtr_config, "ref_layers", None) or [0]
 
-        original_visual_len = img_end - img_start if has_visual else 0
         vtr_context: Dict[str, Any] = {"image_token_range": (img_start, img_end)}
         # grid (h, w) after the 2x2 spatial merge, for spectral scoring.
         if should_prune and self.image_grid_thw is not None:
@@ -170,6 +176,7 @@ class PrunableQwen2VLTextModel(Qwen2VLTextModel):
             if should_prune and layer_idx in prune_layers and last_attention is not None and (img_end - img_start) > 0:
                 prune_step = prune_layers.index(layer_idx)
                 seq_len_before = hidden_states.shape[1]
+                current_len = img_end - img_start
 
                 vtr_context["hidden_states"] = hidden_states  # z_Lk (current features)
                 score_context = {k: v for k, v in vtr_context.items() if k != "image_token_range"}
@@ -177,13 +184,13 @@ class PrunableQwen2VLTextModel(Qwen2VLTextModel):
                     last_attention, (img_start, img_end), vtr_config,
                     layer_idx=prune_step, **score_context,
                 )
-                # Keep count: ratio is applied to the ORIGINAL visual length (CLSE semantics),
-                # so we pass original_visual_len as the token count to select_tokens.
+                # Generic (Qwen3-VL) convention: the keep ratio is applied to the CURRENT
+                # number of surviving visual tokens (ratio-of-current), not the original
+                # visual length. This is the prunable-base behaviour shared with Qwen3-VL.
                 keep_rel = self.vtr_strategy.select_tokens(
-                    scores, original_visual_len, vtr_config, layer_idx=prune_step,
+                    scores, current_len, vtr_config, layer_idx=prune_step,
                 )
                 num_kept = len(keep_rel)
-                current_len = img_end - img_start
 
                 if 0 < num_kept < current_len:
                     keep_rel = keep_rel.sort().values
@@ -203,6 +210,22 @@ class PrunableQwen2VLTextModel(Qwen2VLTextModel):
                         for mk, mv in causal_mask_mapping.items():
                             if mv is not None and isinstance(mv, torch.Tensor) and mv.shape[-1] == seq_len_before:
                                 causal_mask_mapping[mk] = mv.index_select(-2, keep_indexs).index_select(-1, keep_indexs)
+
+                    # Generic (Qwen3-VL) convention: trim the KV cache of every layer
+                    # computed so far so all layers carry the same pruned sequence
+                    # (standard handling, transformers >= 4.57 DynamicCache .layers API).
+                    # The byte-exact CLSE replica skipped this and left the cache ragged
+                    # across layers to reproduce the original numbers.
+                    cache_layers = getattr(past_key_values, "layers", None)
+                    if cache_layers is not None:
+                        for i in range(min(layer_idx, len(cache_layers))):
+                            lyr = cache_layers[i]
+                            k = getattr(lyr, "keys", None)
+                            v = getattr(lyr, "values", None)
+                            if (isinstance(k, torch.Tensor) and k.dim() == 4
+                                    and k.shape[2] == seq_len_before):
+                                lyr.keys = k.index_select(2, keep_indexs)
+                                lyr.values = v.index_select(2, keep_indexs)
 
                     position_embeddings = self.rotary_emb(hidden_states, position_ids)
                     img_end = img_start + num_kept
