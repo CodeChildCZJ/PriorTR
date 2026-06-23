@@ -85,15 +85,51 @@ def _calculate_evolution_score(z_L: torch.Tensor, z_Lk: torch.Tensor,
     raise ValueError(f"Unknown score_type: {score_type}")
 
 
+# Nominal retain ratio -> per-stage keep ratios (of the ORIGINAL visual length).
+# Matches the original CLSE Qwen2-VL ``ratio_dict``; a single ``config.retain_ratio``
+# (0.334 / 0.223 / 0.112) activates the whole 3-stage schedule so users never hand-
+# convert per-stage ratios. (The LLaVA analog is a fixed-token ``_TOKEN_DICT`` keyed by
+# ``keep_tokens``; Qwen images vary in size, so the schedule is expressed as ratios.)
+_RATIO_DICT = {
+    0.334: [0.57, 0.36, 0.098],
+    0.223: [0.38, 0.24, 0.066],
+    0.112: [0.19, 0.12, 0.034],
+}
+
+
 class CLSEStrategy(VTRStrategy):
-    """CLSE (Cross-Layer Spectral Evolution) progressive pruning for Qwen3-VL.
+    """CLSE (Cross-Layer Spectral Evolution) progressive pruning for Qwen2/Qwen3-VL.
 
     Stage 0 (first prune layer): spectral-evolution x attention on the full visual grid.
     Later stages: attention-only (the grid is broken once tokens are dropped).
+
+    Keep budget. If ``config.retain_ratio`` is set, the hard-coded ``_RATIO_DICT``
+    schedule is activated: at stage ``s`` the strategy keeps
+    ``round(original_visual_len * schedule[s])`` tokens (absolute, taken from the
+    original length captured in :meth:`prepare`). This reproduces the original CLSE
+    per-stage budgets regardless of the model's ratio-of-current forward convention,
+    so a single knob is enough. Otherwise it falls back to the base selection driven
+    by ``keep_ratio`` / ``keep_tokens`` (ratio-of-current).
     """
 
     CUTOFF_RATIO = 0.1
     SCORE_TYPE = "clse_attn"
+
+    def __init__(self) -> None:
+        self._cur_keep: Optional[int] = None
+
+    @staticmethod
+    def _schedule(config: VTRConfig):
+        """Per-stage keep ratios (of original length) for this retain_ratio, or None."""
+        r = getattr(config, "retain_ratio", None)
+        if r is None:
+            return None
+        sched = _RATIO_DICT.get(round(float(r), 3))
+        if sched is None:
+            # Fallback for non-standard budgets: same 3-stage shape as the 0.334
+            # reference (330/210/62 over 192 -> 1.72 / 1.09 / 0.32), scaled to r.
+            sched = [r * 1.72, r * 1.09, r * 0.32]
+        return sched
 
     def prepare(self, hidden_states: torch.Tensor, config: VTRConfig,
                 context: dict) -> None:
@@ -114,6 +150,18 @@ class CLSEStrategy(VTRStrategy):
         grid = context.get("grid_hw")
         z_ref = context.get("z_ref")
         hs = context.get("hidden_states")
+
+        # Resolve the per-stage absolute keep count from the hard-coded schedule, using
+        # the ORIGINAL visual length (z_ref is snapshotted before any pruning).
+        sched = self._schedule(config)
+        if sched is not None:
+            orig_len = z_ref.shape[1] if z_ref is not None else (img_end - img_start)
+            stage = min(int(layer_idx), len(sched) - 1)
+            # floor (not round) so a nominal retain_ratio reproduces the original CLSE
+            # per-stage budget exactly: keep = int(original_len * schedule[stage]).
+            self._cur_keep = max(1, int(orig_len * sched[stage]))
+        else:
+            self._cur_keep = None
 
         # Spectral-evolution term only at the first stage, and only when the kept image
         # tokens still form a complete h x w grid (single, unpruned image).
@@ -136,6 +184,16 @@ class CLSEStrategy(VTRStrategy):
         if score.dim() == 2:
             score = score.squeeze(0)  # [num_img]
         return score
+
+    def select_tokens(self, scores, num_tokens, config, layer_idx: int = 0):
+        """Keep ``self._cur_keep`` tokens (absolute, hard-coded schedule) when
+        ``retain_ratio`` is active; otherwise defer to the base ratio-of-current path."""
+        if self._cur_keep is not None:
+            k = min(int(self._cur_keep), int(num_tokens))
+            if k <= 0:
+                return torch.tensor([], dtype=torch.long, device=scores.device)
+            return scores.topk(k).indices.sort().values
+        return super().select_tokens(scores, num_tokens, config, layer_idx)
 
     def __repr__(self) -> str:
         return "CLSEStrategy()"

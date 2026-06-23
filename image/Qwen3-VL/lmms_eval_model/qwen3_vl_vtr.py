@@ -56,6 +56,7 @@ class Qwen3_VL_VTR(Qwen3_VL):
         vtr_strategy: str = "priortr",
         vtr_keep_ratio: Union[str, float] = 0.1111,
         vtr_keep_tokens: Optional[str] = None,
+        vtr_retain_ratio: Optional[Union[str, float]] = None,
         vtr_prune_layer: Union[str, int] = 3,
         vtr_query_aggregation: str = "auto",
         vtr_head_aggregation: str = "mean",
@@ -93,6 +94,10 @@ class Qwen3_VL_VTR(Qwen3_VL):
         )
         if vtr_keep_tokens is not None:
             config_kwargs["keep_tokens"] = _parse_int_or_list(vtr_keep_tokens)
+        if vtr_retain_ratio is not None:
+            # CLSE convenience knob: one nominal retain ratio (0.334 / 0.223 / 0.112)
+            # activates the hard-coded per-stage schedule (see strategy/clse.py).
+            config_kwargs["retain_ratio"] = float(vtr_retain_ratio)
 
         self._vtr_config = VTRConfig(**config_kwargs)
 
@@ -179,5 +184,6 @@ class Qwen3_VL_VTR(Qwen3_VL):
             f"VTR Config: enabled={self._vtr_config.enabled}, "
             f"strategy={self._vtr_config.strategy}, "
             f"keep_ratio={self._vtr_config.keep_ratio}, "
+            f"retain_ratio={self._vtr_config.retain_ratio}, "
             f"prune_layer={self._vtr_config.prune_layer}"
         )

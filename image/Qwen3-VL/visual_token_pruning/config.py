@@ -73,6 +73,13 @@ class VTRConfig:
     keep_tokens: Optional[Union[int, List[int]]] = None
     score_threshold: Optional[Union[float, List[float]]] = None
 
+    # CLSE convenience knob: a single nominal retain ratio (e.g. 0.334 / 0.223 / 0.112)
+    # that activates the hard-coded per-stage CLSE schedule, so a user does not have to
+    # hand-convert per-stage ratios. When set (and strategy="clse"), the CLSE strategy
+    # expands it via its _RATIO_DICT into absolute per-stage keep counts taken from the
+    # original visual length. See visual_token_pruning/strategy/clse.py.
+    retain_ratio: Optional[float] = None
+
     # Token merge (SparseVLM)
     token_merge: bool = False
     merge_clusters: Union[int, List[int]] = 10
@@ -157,6 +164,13 @@ class VTRConfig:
                     raise ValueError(
                         f"keep_tokens must be non-negative, got {self.keep_tokens}"
                     )
+
+        # Validate retain_ratio (CLSE convenience budget) if provided
+        if self.retain_ratio is not None:
+            if not 0.0 < self.retain_ratio <= 1.0:
+                raise ValueError(
+                    f"retain_ratio must be in (0.0, 1.0], got {self.retain_ratio}"
+                )
 
         # Validate prune_layer (must come before list-length checks)
         if isinstance(self.prune_layer, int):
