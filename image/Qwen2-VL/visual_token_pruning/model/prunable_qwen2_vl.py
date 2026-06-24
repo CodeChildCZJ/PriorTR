@@ -36,7 +36,7 @@ class PrunableQwen2VLTextModel(Qwen2VLTextModel):
     Use :meth:`setup_vtr` to attach a config + strategy. With VTR disabled the
     forward is the stock Qwen2-VL forward (delegated to the parent class).
     ``visual_pos_masks`` and ``image_grid_thw`` are set on this module per-forward
-    by the (patched) Qwen2VLForConditionalGeneration wrapper.
+    by ``VTRQwen2VLForConditionalGeneration.forward`` (no transformers patch needed).
     """
 
     def setup_vtr(self, config: VTRConfig, strategy: VTRStrategy) -> None:
