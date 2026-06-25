@@ -39,7 +39,25 @@ class VTRQwen2VLForConditionalGeneration(Qwen2VLForConditionalGeneration):
             f"strategy={self.vtr_config.strategy}, keep_ratio={self.vtr_config.keep_ratio}"
         )
 
-    def forward(self, input_ids=None, image_grid_thw=None, **kwargs):
+    def forward(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        position_ids=None,
+        past_key_values=None,
+        inputs_embeds=None,
+        labels=None,
+        use_cache=None,
+        output_attentions=None,
+        output_hidden_states=None,
+        pixel_values=None,
+        pixel_values_videos=None,
+        image_grid_thw=None,
+        video_grid_thw=None,
+        rope_deltas=None,
+        cache_position=None,
+        **kwargs,
+    ):
         """Forward with self-contained visual-mask / grid plumbing.
 
         The prunable text model reads the visual position mask and the image grid
@@ -48,6 +66,14 @@ class VTRQwen2VLForConditionalGeneration(Qwen2VLForConditionalGeneration):
         ``Qwen2VLForConditionalGeneration.forward`` needs no patch. During decode
         ``image_grid_thw`` is ``None`` and the new token is not an image token, so
         no pruning happens (matches the prefill-only design).
+
+        The full stock signature is mirrored on purpose: transformers'
+        ``GenerationMixin.prepare_inputs_for_generation`` introspects this
+        ``forward`` signature to decide whether to synthesise ``position_ids``.
+        A narrowed ``(input_ids, image_grid_thw, **kwargs)`` signature hides
+        ``position_ids`` inside ``**kwargs``, so the generic prep skips creating
+        it and Qwen2-VL's ``prepare_inputs_for_generation`` then crashes on a
+        ``None`` ``position_ids``. Keeping the named parameters avoids that.
         """
         if getattr(self, "vtr_config", None) is not None and self.vtr_config.enabled:
             lm = self.model.language_model
@@ -55,7 +81,24 @@ class VTRQwen2VLForConditionalGeneration(Qwen2VLForConditionalGeneration):
                 image_token_id = getattr(self.config, "image_token_id", 151655)
                 lm.visual_pos_masks = (input_ids == image_token_id)
             lm.image_grid_thw = image_grid_thw
-        return super().forward(input_ids=input_ids, image_grid_thw=image_grid_thw, **kwargs)
+        return super().forward(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            past_key_values=past_key_values,
+            inputs_embeds=inputs_embeds,
+            labels=labels,
+            use_cache=use_cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            pixel_values=pixel_values,
+            pixel_values_videos=pixel_values_videos,
+            image_grid_thw=image_grid_thw,
+            video_grid_thw=video_grid_thw,
+            rope_deltas=rope_deltas,
+            cache_position=cache_position,
+            **kwargs,
+        )
 
     def _create_strategy(self, strategy_name: str) -> VTRStrategy:
         if strategy_name == "fastv":

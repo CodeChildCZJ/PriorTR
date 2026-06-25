@@ -34,7 +34,7 @@ the per-model README, then `strategy=clse` is available immediately.
 ### Qwen2-VL setup (inline)
 
 ```bash
-conda create -n priortr-qwen2vl python=3.10 -y
+conda create -n priortr-qwen2vl python=3.10 -y -c conda-forge --override-channels
 conda activate priortr-qwen2vl
 
 # 1. PyTorch — cu121 for standard GPUs, cu128 for Blackwell / RTX PRO (SM_120+)
@@ -42,7 +42,7 @@ pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 #   or: --index-url https://download.pytorch.org/whl/cu128
 
 # 2. Qwen2-VL stack (DynamicCache `.layers` API requires transformers >= 4.57)
-pip install "transformers==4.57.*" accelerate qwen-vl-utils pillow
+pip install "transformers==4.57.*" accelerate qwen-vl-utils pillow decord
 ```
 
 > ✅ **No transformers patch needed.** `VTRQwen2VLForConditionalGeneration` sets the visual mask and
@@ -139,8 +139,10 @@ python -m lmms_eval --model qwen2_vl_vtr \
 cd lmms-eval
 M=Qwen/Qwen3-VL-8B-Instruct
 
+# prune_layer is depth-scaled: Qwen3-VL-8B has 36 decoder layers (vs 28 for Qwen2-VL,
+# 32 for LLaVA), so the stages sit at 1;13;24 (≈ the same 0.36 / 0.67 depth fractions).
 python -m lmms_eval --model qwen3_vl_vtr \
-    --model_args "pretrained=$M,attn_implementation=sdpa,vtr_strategy=clse,vtr_prune_layer=1;10;19,vtr_retain_ratio=0.334" \
+    --model_args "pretrained=$M,attn_implementation=sdpa,vtr_strategy=clse,vtr_prune_layer=1;13;24,vtr_retain_ratio=0.334" \
     --tasks mme,gqa --batch_size 1 --output_path ./results/qwen3_clse_0.334
 ```
 
@@ -154,9 +156,20 @@ layers 2–3 are fixed method hyper-parameters** baked into the strategy.
 
 ### 1. The 3-stage keep schedule (the one knob)
 
-Pruning happens in 3 progressive stages at `prune_layer` (LLaVA `[1,11,21]`, Qwen `[1,10,19]`), using
-reference features snapshotted at `ref_layers=[0]`. A single budget knob picks the per-stage keep
-counts from a hard-coded dict.
+Pruning happens in 3 progressive stages at `prune_layer`, using reference features snapshotted at
+`ref_layers=[0]`. A single budget knob picks the per-stage keep counts from a hard-coded dict.
+
+**`prune_layer` scales with the LLM's decoder depth** — the stages sit at roughly the same depth
+fractions (~0.36 / ~0.67) across backbones, so the absolute layer indices differ:
+
+| Backbone | decoder layers | `prune_layer` (stages) |
+|---|:---:|:---:|
+| LLaVA-1.5 | 32 | `[1, 11, 21]` |
+| Qwen2-VL-7B | 28 | `[1, 10, 19]` |
+| Qwen3-VL-8B | 36 | `[1, 13, 24]` |
+
+`prune_layer` is a plain config value (`prune_layer=...` / `vtr_prune_layer=...`), not a buried
+constant — adjust it if you run a backbone with a different layer count.
 
 **LLaVA — `_TOKEN_DICT`, keyed by `keep_tokens`** (absolute counts; fixed 24×24 = 576-token grid):
 
@@ -211,13 +224,22 @@ These are not exposed as config today. If you need to tune the spectral aggressi
 (`CUTOFF_RATIO`) or evolution sensitivity (`temp`), edit them in the strategy file
 (`.../strategy/clse.py`).
 
-## ✅ Reference numbers (full MME, this integration vs. the original method)
+## ✅ Reference numbers (full MME)
 
-| Backbone | budget | CLSE (ours) | baseline | note |
-|---|---|:---:|:---:|---|
-| Qwen2-VL-7B | `retain_ratio=0.334` | **2284.81** | 2316.67 | **bit-identical to original CLSE-Qwen2-VL** (−0.00%); GQA 0.6088 |
-| LLaVA-1.5-7B | `keep_tokens=192/128/64` | within ±0.4% | — | integrated on PriorTR's prunable engine; GQA +0.08% |
-| Qwen3-VL-8B | `retain_ratio=0.334` (mild) | 95.7% retained | 2389.01 | cross-model port (CLSE is native to Qwen2-VL) |
+| Backbone | budget | vanilla | CLSE | retention |
+|---|---|:---:|:---:|:---:|
+| Qwen2-VL-7B | `retain_ratio=0.334` (~10% tokens) | 2313.67 | **2305.58** | **99.65%** |
+| Qwen3-VL-8B | `retain_ratio=0.334`, `prune_layer=1;13;24` | 2389.01 | **2250.12** | **94.2%** |
+| LLaVA-1.5-7B | `keep_tokens=192/128/64` | — | within ±0.4% of original | — |
+
+Notes:
+- **Qwen2-VL** numbers are on **stock `pip install transformers`** (this self-contained build, no
+  patch). The original CLSE-Qwen2-VL reports **2284.81 (98.6%)**; that exact figure is reproduced
+  bit-for-bit only inside the original's *modified* transformers — on stock transformers the
+  self-contained framework lands at 2305.58 / 99.65%. GQA `exact_match` 0.6088–0.6096.
+- **Qwen3-VL** is a cross-model port (CLSE is native to Qwen2-VL). `prune_layer=1;13;24` is
+  depth-aligned to its 36 decoder layers and beats the naive `1;10;19` (2180.32 / 91.3%) by +2.9%.
+- **LLaVA** runs on PriorTR's prunable engine; GQA +0.08% vs the original.
 
 ## 📄 Credit & License
 
