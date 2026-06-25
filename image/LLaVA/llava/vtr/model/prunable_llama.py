@@ -61,6 +61,12 @@ class PrunableLlamaModel(LlamaModel):
         """
         self._vtr_config = config
 
+        # CLSE: when selected with only a budget knob, fill in the depth-aligned 3-stage
+        # prune schedule + ref_layers from this model's actual decoder depth, so the user
+        # does not have to spell out prune_layer/ref_layers. No-op for other strategies.
+        from ..strategy.clse import apply_clse_defaults
+        apply_clse_defaults(config, self.config)
+
         # [Critical] Always replace RoPE regardless of whether VTR is enabled
         # This is a compatibility fix to prevent sparse position_ids from going out of bounds
         self._replace_rope_with_unbounded()

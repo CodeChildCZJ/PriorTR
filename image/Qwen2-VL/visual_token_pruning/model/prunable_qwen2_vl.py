@@ -40,6 +40,10 @@ class PrunableQwen2VLTextModel(Qwen2VLTextModel):
     """
 
     def setup_vtr(self, config: VTRConfig, strategy: VTRStrategy) -> None:
+        # CLSE: when selected with only a budget knob, fill in the depth-aligned 3-stage
+        # prune schedule from this model's decoder depth. No-op for other strategies.
+        from ..strategy.clse import apply_clse_defaults
+        apply_clse_defaults(config, self.config)
         self.vtr_config = config
         self.vtr_strategy = strategy
         # Disable any inherited env-var pruning from the patched base class; this

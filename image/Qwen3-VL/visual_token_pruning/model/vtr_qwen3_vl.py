@@ -68,6 +68,11 @@ class VTRQwen3VLForConditionalGeneration(Qwen3VLForConditionalGeneration):
         self.vtr_strategy = self._create_strategy(self.vtr_config.strategy)
         self._rope_position_offset = 0
 
+        # CLSE: when selected with only a budget knob, fill in the depth-aligned 3-stage
+        # prune schedule from this model's decoder depth. No-op for other strategies.
+        from ..strategy.clse import apply_clse_defaults
+        apply_clse_defaults(self.vtr_config, self.config)
+
         if self.vtr_config.enabled:
             self._replace_text_model()
 
@@ -746,6 +751,10 @@ class VTRQwen3VLForConditionalGeneration(Qwen3VLForConditionalGeneration):
         # Configure VTR
         model.vtr_config = vtr_config or VTRConfig()
         model.vtr_strategy = model._create_strategy(model.vtr_config.strategy)
+
+        # CLSE: resolve depth-aligned prune schedule from the model's decoder depth.
+        from ..strategy.clse import apply_clse_defaults
+        apply_clse_defaults(model.vtr_config, model.config)
 
         if model.vtr_config.enabled:
             model._replace_text_model()

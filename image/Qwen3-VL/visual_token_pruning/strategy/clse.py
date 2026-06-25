@@ -102,6 +102,48 @@ _RATIO_DICT = {
 # on any backbone (192≈1/3, 128≈2/9, 64≈1/9 of LLaVA's 576-token grid).
 _TOKENS_TO_RATIO = {192: 0.334, 128: 0.223, 64: 0.112}
 
+# Depth-aligned default 3-stage prune layers, used when CLSE is selected with only a
+# budget knob (prune_layer left at its scalar default). Keyed by the LLM's decoder
+# depth so the stages sit at ~0.36 / ~0.67 of depth on each backbone (see docs/CLSE.md);
+# an unknown depth falls back to that same fraction.
+_PRUNE_LAYERS_BY_DEPTH = {32: [1, 11, 21], 28: [1, 10, 19], 36: [1, 13, 24]}
+
+
+def default_prune_layers(num_layers) -> list:
+    """The CLSE 3-stage prune schedule for an LLM with ``num_layers`` decoder layers."""
+    if num_layers in _PRUNE_LAYERS_BY_DEPTH:
+        return list(_PRUNE_LAYERS_BY_DEPTH[num_layers])
+    if not num_layers:
+        return [1, 13, 24]
+    return [1, max(1, round(num_layers * 0.36)), max(1, round(num_layers * 0.67))]
+
+
+def _resolve_num_layers(hf_config) -> Optional[int]:
+    for c in (hf_config, getattr(hf_config, "text_config", None),
+              getattr(hf_config, "llm_config", None)):
+        n = getattr(c, "num_hidden_layers", None)
+        if isinstance(n, int) and n > 0:
+            return n
+    return None
+
+
+def apply_clse_defaults(vtr_config, hf_config) -> None:
+    """Fill in CLSE's natural defaults so one budget knob is enough.
+
+    When ``strategy='clse'`` and ``prune_layer`` is still a scalar (the user did not spell
+    out the 3-stage schedule), resolve it to the depth-aligned default for this model.
+    No-op for any other strategy; never overrides an explicit list. Mirrors docs/CLSE.md.
+    """
+    if getattr(vtr_config, "strategy", None) != "clse":
+        return
+    if isinstance(vtr_config.prune_layer, int) and not isinstance(vtr_config.prune_layer, bool):
+        vtr_config.prune_layer = default_prune_layers(_resolve_num_layers(hf_config))
+        # Refresh any cached list form (LLaVA caches; Qwen reads it live).
+        if hasattr(vtr_config, "_prune_layers"):
+            vtr_config._prune_layers = sorted(vtr_config.prune_layer)
+    if hasattr(vtr_config, "ref_layers") and not getattr(vtr_config, "ref_layers"):
+        vtr_config.ref_layers = [0]
+
 
 class CLSEStrategy(VTRStrategy):
     """CLSE (Cross-Layer Spectral Evolution) progressive pruning for Qwen2/Qwen3-VL.
