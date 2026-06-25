@@ -243,9 +243,14 @@ exposed as config — see section 2.
 
 Notes:
 - **Qwen2-VL** numbers are on **stock `pip install transformers`** (this self-contained build, no
-  patch). The original CLSE-Qwen2-VL reports **2284.81 (98.6%)**; that exact figure is reproduced
-  bit-for-bit only inside the original's *modified* transformers — on stock transformers the
-  self-contained framework lands at 2305.58 / 99.65%. GQA `exact_match` 0.6088–0.6096.
+  patch). The original CLSE-Qwen2-VL implements pruning by rewriting `Qwen2VLTextModel` *in-place*
+  (env-var driven) and reports **2284.81 (98.6%)**. Running this framework's **identical code** in the
+  original's modified transformers reproduces **2284.81 bit-for-bit**; on stock transformers it lands
+  at **2305.58 (99.65%)**. The ~21-point gap is **entirely the transformers environment**, not the
+  pruning code — the modified build even shifts the *un-pruned* baseline (vanilla 2316.67 patched vs
+  2313.67 stock), and that difference amplifies under pruning. So the framework is both faithful
+  (reproduces the original exactly in its env) and cleaner (higher retention on stock).
+  GQA `exact_match` 0.6088–0.6096.
 - **Qwen3-VL** is a cross-model port (CLSE is native to Qwen2-VL). `prune_layer=1;13;24` is
   depth-aligned to its 36 decoder layers and beats the naive `1;10;19` (2180.32 / 91.3%) by +2.9%.
 - **LLaVA** runs on PriorTR's prunable engine; GQA +0.08% vs the original.
