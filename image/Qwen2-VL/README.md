@@ -105,7 +105,7 @@ Passed via `--model_args` as comma-separated `key=value` pairs. List-valued para
 | `vtr_strategy` | str | `priortr` | `priortr`, `fastv`, or `clse` |
 | `vtr_prune_layer` | int \| list | `3` | Layer(s) to prune (CLSE auto-resolves to `1;10;19` if left scalar) |
 | `vtr_keep_tokens` | int \| list | `None` | Exact tokens to keep (overrides `vtr_keep_ratio`) |
-| `vtr_keep_ratio` | float \| list | `0.5` | Fraction to keep (used when `vtr_keep_tokens` is unset) |
+| `vtr_keep_ratio` | float \| list | `0.1111` | Fraction to keep (used when `vtr_keep_tokens` is unset) |
 | `vtr_query_aggregation` | str | `auto` | `auto`, `last`, or `question` (auto → `question` for priortr) |
 | `vtr_head_aggregation` | str | `mean` | Aggregate across heads: `mean` or `max` |
 

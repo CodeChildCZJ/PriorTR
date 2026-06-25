@@ -161,13 +161,14 @@ class PrunableQwen2VLTextModel(Qwen2VLTextModel):
 
         vtr_context: Dict[str, Any] = {"image_token_range": (img_start, img_end)}
         # grid (h, w) after the 2x2 spatial merge, for spectral scoring.
-        if should_prune and self.image_grid_thw is not None:
-            try:
-                _h = int(self.image_grid_thw[0][1].item()) // 2
-                _w = int(self.image_grid_thw[0][2].item()) // 2
-                vtr_context["grid_hw"] = (_h, _w)
-            except Exception:
-                pass
+        if should_prune and self.image_grid_thw is not None and len(self.image_grid_thw) > 0:
+            # Spectral grid from the FIRST image (matches the CLSE reference, which also reads
+            # image_grid_thw[0]). Multi-image / video inputs whose total visual length does not
+            # match this single grid fall back to attention-only scoring in the strategy
+            # (z_ref.shape[1] != grid_h*grid_w), rather than being silently swallowed here.
+            _h = int(self.image_grid_thw[0][1].item()) // 2
+            _w = int(self.image_grid_thw[0][2].item()) // 2
+            vtr_context["grid_hw"] = (_h, _w)
 
         # one-time setup (snapshots reference features z_L from the input embeddings)
         if should_prune:
@@ -176,6 +177,12 @@ class PrunableQwen2VLTextModel(Qwen2VLTextModel):
         last_attention = None  # full attention captured at layer k-1
 
         for layer_idx, decoder_layer in enumerate(self.layers):
+            # [CLSE] Snapshot reference image features z_ref at config.ref_layers (before this
+            # layer runs), honoring ref_layers like the LLaVA/Video backbones. Default [0]
+            # => snapshot at the input embeddings, identical to the previous behaviour.
+            if should_prune and layer_idx in ref_layers and (img_end - img_start) > 0:
+                vtr_context["z_ref"] = hidden_states[:, img_start:img_end, :]
+
             # --- Prune at each layer in prune_layers (K_list) ---
             if should_prune and layer_idx in prune_layers and last_attention is not None and (img_end - img_start) > 0:
                 prune_step = prune_layers.index(layer_idx)

@@ -80,16 +80,8 @@ class PrunableLlamaModel(LlamaModel):
         self._replace_rope_with_unbounded()
 
         if config.enabled:
-            self.ave_tokens = config.keep_tokens
-            prune_all_layer_idx = -1
-            for i in range(15, 28):
-                if i in config.prune_layers:
-                    prune_all_layer_idx = i
-                    break
-            self.prune_all_layer_idx = prune_all_layer_idx
-            if prune_all_layer_idx != -1:
-                config.keep_tokens = round((self.ave_tokens * 32 - 576 * 3) / (prune_all_layer_idx - 3))
-
+            # Prune at config.prune_layers using keep_tokens directly (LLaVA-style): no
+            # layer-averaged token recompute, so an explicit keep_tokens is never rewritten.
             self._vtr_strategy = get_strategy(config.strategy)
             logger.debug(f"VTR enabled with strategy: {config.strategy}, "
                         f"prune_layers: {config.prune_layers}, "
@@ -294,8 +286,6 @@ class PrunableLlamaModel(LlamaModel):
         prune_layer_set = self._get_prune_layer_set() if should_prune else set()
         vtr_ctx = vtr_ctx or {}
 
-        prune_all_layer_idx = self.prune_all_layer_idx
-
         # Track current image_token_range (dynamically updated during multi-layer pruning)
         current_image_range = image_token_range
 
@@ -388,13 +378,6 @@ class PrunableLlamaModel(LlamaModel):
             # Prune immediately after K-1 layer
             if need_attention_for_pruning and current_image_range is not None:
 
-                tmp_keep_tokens = self._vtr_config.keep_tokens
-                tmp_strategy = self._vtr_strategy
-
-                if prune_all_layer_idx - 1 == layer_idx:
-                    # Remove all remaining image tokens at this layer
-                    self._vtr_config.keep_tokens = 0
-
                 attention_weights = layer_outputs[1]
                 if attention_weights is None:
                     if self._use_flash_attention_2:
@@ -420,10 +403,6 @@ class PrunableLlamaModel(LlamaModel):
                         vtr_ctx=vtr_ctx,
                     )
                 seq_length = new_seq_len
-
-                if prune_all_layer_idx - 1 == layer_idx:
-                    self._vtr_config.keep_tokens = tmp_keep_tokens
-                    self._vtr_strategy = tmp_strategy
 
                 # Update image_token_range for next pruning layer
                 current_image_range = self._current_image_token_range = new_image_range

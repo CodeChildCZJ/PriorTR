@@ -189,12 +189,9 @@ class CLSEStrategy(VTRStrategy):
 
     def prepare(self, hidden_states: torch.Tensor, config: VTRConfig,
                 context: dict) -> None:
-        """Snapshot the reference image features z_L at the model input (L_list=[0])."""
-        rng = context.get("image_token_range")
-        if rng is not None:
-            s, e = rng
-            if e > s:
-                context["z_ref"] = hidden_states[:, s:e, :]
+        """No-op: z_ref is snapshotted in the decoder loop at config.ref_layers (see the
+        prunable model), so the reference layer is honored instead of being fixed at [0]."""
+        return
 
     def compute_scores(self, attention, image_token_range, config,
                        layer_idx: int = 0, **context: Any) -> torch.Tensor:

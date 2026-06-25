@@ -169,6 +169,16 @@ class PrunableQwen3VLTextModel(Qwen3VLTextModel):
 
         # Decoder layer loop
         for layer_idx, decoder_layer in enumerate(self.layers):
+            # [CLSE] Snapshot reference image features z_ref at config.ref_layers (before this
+            # layer runs), honoring ref_layers like the LLaVA/Video backbones. Default [0]
+            # => snapshot at the input embeddings, identical to the previous behaviour.
+            if current_image_range is not None:
+                _ref_layers = getattr(vtr_config, "ref_layers", None) or []
+                if layer_idx in _ref_layers:
+                    _rs, _re = current_image_range
+                    if _re > _rs:
+                        vtr_context["z_ref"] = hidden_states[:, _rs:_re, :]
+
             # Check if this is the score layer (layer before a prune_layer)
             is_score_layer = (layer_idx + 1) in prune_layers
 

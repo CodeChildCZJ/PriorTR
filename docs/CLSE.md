@@ -11,7 +11,7 @@
 
 | Backbone | wrapper (`--model`) | budget knob | env · transformers |
 |---|---|---|---|
-| **LLaVA-1.5/1.6** | `llava_vtr` | `keep_tokens` = 192 / 128 / 64 | [README](../image/LLaVA/README.md) · 4.37 |
+| **LLaVA-1.5** | `llava_vtr` | `keep_tokens` = 192 / 128 / 64 | [README](../image/LLaVA/README.md) · 4.37 |
 | **Qwen2-VL-7B** | `qwen2_vl_vtr` | `vtr_retain_ratio` = 0.334 / 0.223 / 0.112 | [README](../image/Qwen2-VL/README.md) · 4.57 |
 | **Qwen3-VL-8B** | `qwen3_vl_vtr` | `vtr_retain_ratio` = 0.334 / 0.223 / 0.112 | [README](../image/Qwen3-VL/README.md) · 5.2 |
 | **Video-LLaVA-7B** | *native script* | `--vtr_keep_tokens` (of 2048) | [README](../video/Video-LLaVA/README.md) · 4.37 |

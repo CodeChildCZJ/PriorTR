@@ -51,7 +51,7 @@ class Qwen2_VL_VTR(Qwen2_VL):
         # VTR parameters
         vtr_enabled: bool = True,
         vtr_strategy: str = "priortr",
-        vtr_keep_ratio: Union[str, float] = "0.5",
+        vtr_keep_ratio: Union[str, float] = 0.1111,
         vtr_keep_tokens: Optional[str] = None,
         vtr_retain_ratio: Optional[Union[str, float]] = None,
         vtr_clse_cutoff_ratio: Optional[Union[str, float]] = None,

@@ -15,15 +15,15 @@ class VTRConfig:
     """Configuration for Visual Token Reduction (VTR).
 
     This configuration class controls the behavior of visual token pruning
-    strategies such as FastV and PriorTR-2F.
+    strategies such as FastV, PriorTR, and CLSE.
 
     Attributes:
         enabled: Whether VTR is enabled. If False, no pruning occurs.
-        strategy: The pruning strategy to use. Options: "fastv", "priortr_2f", "sparsevlm", "priortr", "vispruner".
+        strategy: The pruning strategy to use. Options: "fastv", "priortr", "clse".
 
         prune_layer: The layer(s) at which to perform pruning.
-            - int: Single layer pruning (FastV/PriorTR-2F style)
-            - List[int]: Multi-layer pruning (SparseVLMs style, reserved)
+            - int: Single-layer pruning (FastV / PriorTR style)
+            - List[int]: Multi-layer pruning (CLSE 3-stage style)
 
         keep_ratio: Fraction of image tokens to keep (0.0 to 1.0).
             Used when neither keep_tokens nor score_threshold is set.
@@ -34,7 +34,7 @@ class VTRConfig:
             Takes priority over keep_ratio but not keep_tokens.
 
         query_aggregation: How to aggregate query tokens for attention extraction.
-            - "auto": Resolve per strategy ("question" for priortr/priortr_2f, "last" for others)
+            - "auto": Resolve per strategy ("question" for priortr, "last" for others)
             - "last": Use only the last token
             - "question": Average over all question tokens
         head_aggregation: How to aggregate attention across heads.
@@ -94,7 +94,7 @@ class VTRConfig:
     important_ratio: float = 0.5  # Fraction of kept tokens selected by importance (rest by diversity)
 
     # Attention aggregation methods
-    # "auto" resolves per strategy: "question" for priortr/priortr_2f, "last" for fastv/others
+    # "auto" resolves per strategy: "question" for priortr, "last" for fastv/others
     query_aggregation: str = "auto"
     head_aggregation: str = "mean"
 
@@ -118,8 +118,10 @@ class VTRConfig:
         Raises:
             ValueError: If configuration values are invalid.
         """
-        # Validate strategy
-        valid_strategies = {"fastv", "priortr_2f", "sparsevlm", "priortr", "vispruner", "clse"}
+        # Validate strategy. Only the strategies actually implemented for Qwen2-VL are
+        # accepted here (see strategy/__init__.py); accepting others would pass validation
+        # and then crash later in strategy construction.
+        valid_strategies = {"fastv", "priortr", "clse"}
         if self.strategy not in valid_strategies:
             raise ValueError(
                 f"Invalid strategy '{self.strategy}'. "
@@ -128,15 +130,10 @@ class VTRConfig:
 
         # Resolve "auto" query_aggregation based on strategy
         if self.query_aggregation == "auto":
-            if self.strategy in ("priortr", "priortr_2f"):
+            if self.strategy == "priortr":
                 self.query_aggregation = "question"
             else:
                 self.query_aggregation = "last"
-
-        # VisPruner: force prune_layer=1 (pre-LLM pruning at layer 0)
-        if self.strategy == "vispruner" and self.prune_layer != 1:
-            logger.info("VisPruner: overriding prune_layer to 1 (pre-LLM pruning)")
-            self.prune_layer = 1
 
         # Validate important_ratio
         if not 0.0 < self.important_ratio <= 1.0:

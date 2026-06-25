@@ -154,7 +154,22 @@ class VTRLlavaForCausalLM(LlavaLlamaForCausalLM):
         """
         is_16 = self._is_llava_16()
 
-        if config.keep_tokens is None:
+        # CLSE only supports LLaVA-1.5 (fixed 576-token 24x24 grid). LLaVA-1.6 / LLaVA-NeXT
+        # (anyres, variable token count) has no regular grid for the 2D-FFT spectral term,
+        # so reject it with a clear error instead of crashing later in the FFT reshape.
+        if config.enabled and config.strategy == "clse" and is_16:
+            raise ValueError(
+                "CLSE is only supported on LLaVA-1.5 (576-token 24x24 grid); "
+                "LLaVA-1.6 / LLaVA-NeXT (anyres) is not supported by CLSE. "
+                "Use strategy='priortr' or 'fastv' on LLaVA-1.6."
+            )
+
+        # Don't auto-fill keep_tokens when CLSE was given an explicit retain_ratio, so its
+        # ratio schedule actually takes effect (otherwise _schedule reads keep_tokens first
+        # and the retain_ratio is silently ignored).
+        if config.keep_tokens is None and not (
+            config.strategy == "clse" and getattr(config, "retain_ratio", None) is not None
+        ):
             config.keep_tokens = 320 if is_16 else 192
         if config.query_aggregation is None:
             config.query_aggregation = "last" if is_16 else "question"
