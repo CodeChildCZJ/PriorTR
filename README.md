@@ -24,7 +24,7 @@
 </p>
 
 <p align="center">
-  <a href="#"><img src="https://img.shields.io/badge/arXiv-coming%20soon-b31b1b.svg" alt="arXiv"></a>
+  <a href="https://arxiv.org/abs/2606.24156"><img src="https://img.shields.io/badge/arXiv-2606.24156-b31b1b.svg?logo=arxiv" alt="arXiv"></a>
   <a href="https://github.com/CodeChildCZJ/PriorTR"><img src="https://img.shields.io/badge/Code-PriorTR-181717.svg?logo=github" alt="Code"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License"></a>
   <a href="https://github.com/CodeChildCZJ/PriorTR/stargazers"><img src="https://img.shields.io/github/stars/CodeChildCZJ/PriorTR?style=social" alt="GitHub stars"></a>
@@ -39,9 +39,10 @@
 
 ## 📜 News
 
+- **[2026-06-25]** 🧩 CLSE (Cross-Layer Spectral Evolution) is now integrated as a drop-in pruning strategy across all four backbones — including Video-LLaVA. See [docs/CLSE.md](docs/CLSE.md).
+- **[2026-06-23]** 📄 arXiv preprint is out: [arXiv:2606.24156](https://arxiv.org/abs/2606.24156).
 - **[2026-06-20]** 🎉 Code released — PriorTR across LLaVA-1.5, InternVL2.5, Qwen3-VL, and Video-LLaVA, with a unified runner.
 - **[2026-06-18]** 🎉 PriorTR is accepted to **ECCV 2026**!
-- **[coming soon]** 📄 arXiv preprint.
 
 ## 📖 Introduction
 
@@ -85,15 +86,21 @@ PriorTR consistently leads, with the largest margin under the tightest token bud
 | SparseVLM | ICML'25 | 97.4 | 91.2 | 81.4 |
 | PruMerge | ICCV'25 | 89.1 | 85.3 | 83.0 |
 | VisPruner | ICCV'25 | 98.5 | 96.6 | 91.7 |
+| CLSE&nbsp;&dagger; | ECCV'26 | 99.4 | 98.1 | 94.8 |
 | **PriorTR (Ours)** | **ECCV'26** | **99.5** | **98.2** | **94.5** |
 
 <p align="center">
   <img src="assets/spider.png" width="92%" alt="Radar comparison under 64 / 128 / 192 token budgets">
 </p>
 
-Values are the averaged normalized score (%); best in **bold**. PriorTR covers the largest area across
-benchmarks at every budget. See the [paper](#) for full per-benchmark tables, video (Video-LLaVA)
-results, and ablations.
+Values are the averaged normalized score (%); **Ours** in bold. PriorTR covers the largest area among
+these baselines at every budget. See the [paper](https://arxiv.org/abs/2606.24156) for full
+per-benchmark tables, video (Video-LLaVA) results, and ablations.
+
+> **&dagger;** CLSE numbers are **as reported in the [CLSE paper](docs/CLSE.md)**, averaged over a
+> *different* 9-benchmark set (GQA, MMB, MMB-CN, MME, POPE, SQA, TextVQA, VizWiz, OCRBench) rather than
+> the 12 above, so this row is **not a strict head-to-head** with PriorTR. CLSE is concurrent ECCV'26
+> work that we also **integrate** as a drop-in strategy (see [docs/CLSE.md](docs/CLSE.md)).
 
 ## 🗂️ Supported Models
 
@@ -107,10 +114,9 @@ results, and ablations.
 
 Each subproject pins a **mutually-incompatible** `transformers` version, so every model lives in its
 **own conda env** — they cannot coexist in one Python process. **PriorTR-2F** is the two-forward variant
-of PriorTR (an explicit prior forward instead of the single-forward causal-mask shortcut); Video-LLaVA
-has no single-forward PriorTR because video lacks that shortcut. **CLSE** (Cross-Layer Spectral
-Evolution) is an integrated drop-in strategy across all four backbones — three-stage on the image
-models, single-stage on Video-LLaVA — see [docs/CLSE.md](docs/CLSE.md).
+of PriorTR (an explicit prior forward instead of the single-forward causal-mask shortcut), and **CLSE**
+(Cross-Layer Spectral Evolution) is an integrated drop-in pruning strategy across all four backbones —
+three-stage on the image models, single-stage on Video-LLaVA — see [docs/CLSE.md](docs/CLSE.md).
 
 ## ⚙️ Installation
 
@@ -132,11 +138,6 @@ wrapper) — see the per-model README. **Video-LLaVA** ships its own inference s
 lmms-eval. Weights and benchmark data download from HuggingFace on first run.
 
 → Per-model setup: [LLaVA](image/LLaVA/README.md) · [InternVL](image/InternVL/README.md) · [Qwen2-VL](image/Qwen2-VL/README.md) · [Qwen3-VL](image/Qwen3-VL/README.md) · [Video-LLaVA](video/Video-LLaVA/README.md)
-
-> **Reproducibility:** each image subproject ships a locked `environment.yml` (`conda env export`). It
-> pins every transitive version but is a **record, not a one-command rebuild** — `torch` (cu128 index),
-> `transformers` (git/pinned), and the editable `lmms-eval` are off default channels, so install those
-> per the README first; the `.yml` then pins the rest.
 
 ## 🚀 Unified Runner
 
@@ -220,7 +221,8 @@ Built on the open-source MLLMs [LLaVA](https://github.com/haotian-liu/LLaVA),
 [lmms-eval](https://github.com/EvolvingLMMs-Lab/lmms-eval). We also reuse the public implementations of
 the baselines we compare against — [FastV](https://github.com/pkunlp-icler/FastV),
 [SparseVLM](https://github.com/Gumpest/SparseVLMs), and
-[VisPruner](https://github.com/Theia-4869/VisPruner).
+[VisPruner](https://github.com/Theia-4869/VisPruner) — and integrate the concurrent ECCV 2026 method
+[CLSE](https://github.com/zjubinchen/CLSE) as a drop-in strategy ([docs/CLSE.md](docs/CLSE.md)).
 
 ## License
 
