@@ -39,6 +39,30 @@ class VTRConfig:
     query_aggregation: str = "last"    # last / question
     head_aggregation: str = "mean"     # mean / max
 
+    # ---------------------------------------------------------------------
+    # [CLSE] Cross-Layer Spectral Evolution options (drop-in strategy="clse").
+    # No-op for every other strategy: ref_layers stays empty so the spectral
+    # snapshot hook never fires, and the spectral knobs are simply unused.
+    # ---------------------------------------------------------------------
+    # Layer(s) at which to snapshot the reference image features z_L for the
+    # cross-layer spectral-evolution score (CLSE L_list; video default [2]).
+    ref_layers: List[int] = field(default_factory=list)
+
+    # Spectral hyper-parameters (defaults match the CLSE reference).
+    clse_cutoff_ratio: float = 0.1     # Gaussian 2D-FFT high-pass cutoff ratio
+    clse_temp: float = 0.1             # evolution-factor sigmoid temperature
+
+    # Visual-token grid (T, H, W). Video-LLaVA emits 8 x 16 x 16 = 2048 tokens.
+    # The per-frame 2D FFT only runs when T*H*W equals the visual-token count.
+    clse_grid_t: int = 8
+    clse_grid_h: int = 16
+    clse_grid_w: int = 16
+
+    # Use a single 3D FFT instead of the per-frame 2D FFT. The CLSE reference
+    # ships both but defaults to per-frame (sparse 8-frame video makes the
+    # temporal axis alias under a 3D FFT); kept here for parity / ablation.
+    clse_fft_3d: bool = False
+
     def __post_init__(self) -> None:
         """Validate configuration parameters."""
         # Convert single prune_layer to list for unified handling
@@ -92,6 +116,13 @@ class VTRConfig:
             "keep_tokens": self.keep_tokens,
             "query_aggregation": self.query_aggregation,
             "head_aggregation": self.head_aggregation,
+            "ref_layers": self.ref_layers,
+            "clse_cutoff_ratio": self.clse_cutoff_ratio,
+            "clse_temp": self.clse_temp,
+            "clse_grid_t": self.clse_grid_t,
+            "clse_grid_h": self.clse_grid_h,
+            "clse_grid_w": self.clse_grid_w,
+            "clse_fft_3d": self.clse_fft_3d,
         }
 
     @classmethod

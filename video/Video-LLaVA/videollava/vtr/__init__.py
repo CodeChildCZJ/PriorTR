@@ -9,11 +9,14 @@ from .strategy import (
     get_strategy,
     FastVStrategy,
     PriorTR2FStrategy,
+    CLSEStrategy,
+    apply_clse_defaults,
 )
 from .model import (
     PrunableLlamaModel,
     VTRLlavaForCausalLM,
     FastVLlava,
+    CLSELlava,
     PriorTR2FBaseLlava,
     FixedLayerPriorTR2F,
     AdaptiveLayerPriorTR2F,
@@ -30,10 +33,13 @@ __all__ = [
     "get_strategy",
     "FastVStrategy",
     "PriorTR2FStrategy",
+    "CLSEStrategy",
+    "apply_clse_defaults",
     # Model
     "PrunableLlamaModel",
     "VTRLlavaForCausalLM",
     "FastVLlava",
+    "CLSELlava",
     "PriorTR2FBaseLlava",
     "FixedLayerPriorTR2F",
     "AdaptiveLayerPriorTR2F",

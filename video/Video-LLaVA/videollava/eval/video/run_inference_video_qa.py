@@ -51,11 +51,16 @@ def parse_args():
 
     # VTR configuration
     parser.add_argument('--vtr_enabled', action='store_true', help='Enable VTR pruning')
-    parser.add_argument('--vtr_strategy', type=str, default='priortr_2f', choices=['priortr_2f', 'fastv'], help='VTR strategy')
+    parser.add_argument('--vtr_strategy', type=str, default='priortr_2f', choices=['priortr_2f', 'fastv', 'clse'], help='VTR strategy')
     parser.add_argument('--vtr_prune_layer', type=int, default=3, help='Layer to prune at')
     parser.add_argument('--vtr_keep_tokens', type=int, default=194, help='Number of tokens to keep')
     parser.add_argument('--vtr_query_aggregation', type=str, default='question', choices=['question', 'last'], help='Query aggregation method')
     parser.add_argument('--vtr_head_aggregation', type=str, default='mean', choices=['mean', 'max'], help='Head aggregation method')
+    # CLSE-specific (only used when --vtr_strategy clse)
+    parser.add_argument('--vtr_ref_layers', type=int, nargs='+', default=None,
+                        help='CLSE reference layer(s) for the spectral snapshot (default: [prune_layer-1], i.e. [2])')
+    parser.add_argument('--vtr_clse_cutoff_ratio', type=float, default=0.1, help='CLSE 2D-FFT high-pass cutoff ratio')
+    parser.add_argument('--vtr_clse_temp', type=float, default=0.1, help='CLSE evolution-factor sigmoid temperature')
     parser.add_argument('--num_samples', type=int, default=1000, help='Number of samples to evaluate')
 
     return parser.parse_args()
@@ -132,20 +137,41 @@ def run_inference(args):
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
 
-    # Initialize the model
+    # Initialize the model. CLSE needs no prior forward, so it loads the CLSE model
+    # class (FastV-like); priortr_2f / fastv use the two-forward PriorTR-2F class.
     model_name = get_model_name_from_path(args.model_path)
+    model_type = "clse" if (args.vtr_enabled and args.vtr_strategy == "clse") else "priortr_2f_fixed"
     tokenizer, model, processor, context_len = load_vtr_model(
         model_path=args.model_path,
         model_base=args.model_base,
         model_name=model_name,
-        model_type="priortr_2f_fixed",
+        model_type=model_type,
         device=args.device,
     )
     model = model.to(args.device)
     model.eval()
 
     # Configure VTR
-    if args.vtr_enabled:
+    if args.vtr_enabled and args.vtr_strategy == "clse":
+        # CLSE (Cross-Layer Spectral Evolution): single-stage spectral x attention prune.
+        # ref_layers default to [prune_layer - 1] = [2] so z_L = out(L1), z_Lk = out(L2),
+        # attn = attn(L2) line up with the CLSE reference (K_list=[3], L_list=[2]).
+        ref_layers = args.vtr_ref_layers if args.vtr_ref_layers else [args.vtr_prune_layer - 1]
+        print(f"VTR enabled: strategy=clse, prune_layer=[{args.vtr_prune_layer}], "
+              f"ref_layers={ref_layers}, keep_tokens={args.vtr_keep_tokens}, "
+              f"cutoff_ratio={args.vtr_clse_cutoff_ratio}, temp={args.vtr_clse_temp}")
+        cfg = VTRConfig(
+            enabled=True,
+            strategy="clse",
+            prune_layer=[args.vtr_prune_layer],   # explicit list -> respected as-is
+            ref_layers=ref_layers,
+            keep_tokens=args.vtr_keep_tokens,
+            clse_cutoff_ratio=args.vtr_clse_cutoff_ratio,
+            clse_temp=args.vtr_clse_temp,
+            query_aggregation=args.vtr_query_aggregation,
+            head_aggregation=args.vtr_head_aggregation,
+        )
+    elif args.vtr_enabled:
         print(f"VTR enabled: strategy={args.vtr_strategy}, prune_layer={args.vtr_prune_layer}, "
               f"keep_tokens={args.vtr_keep_tokens}, query_agg={args.vtr_query_aggregation}, "
               f"head_agg={args.vtr_head_aggregation}")

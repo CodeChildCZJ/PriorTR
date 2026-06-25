@@ -3,6 +3,7 @@ from .base import PruningStrategy
 from .registry import VTR_REGISTRY, register_strategy, get_strategy
 from .fastv import FastVStrategy
 from .priortr_2f import PriorTR2FStrategy
+from .clse import CLSEStrategy, apply_clse_defaults
 
 __all__ = [
     "PruningStrategy",
@@ -11,5 +12,7 @@ __all__ = [
     "get_strategy",
     "FastVStrategy",
     "PriorTR2FStrategy",
+    "CLSEStrategy",
+    "apply_clse_defaults",
 ]
 

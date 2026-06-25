@@ -69,6 +69,12 @@ class PrunableLlamaModel(LlamaModel):
         """
         self._vtr_config = config
 
+        # CLSE: when selected with only a budget knob, fill in the single-stage video
+        # prune schedule (prune_layer=[3]) + ref_layers=[2] for the spectral snapshot,
+        # so the user does not have to spell them out. No-op for other strategies.
+        from ..strategy.clse import apply_clse_defaults
+        apply_clse_defaults(config, self.config)
+
         # [Critical] Always replace RoPE regardless of VTR enabled state
         # This is a compatibility fix to prevent sparse position_ids from going OOB
         self._replace_rope_with_unbounded()
@@ -324,6 +330,15 @@ class PrunableLlamaModel(LlamaModel):
 
             layer_idx = decoder_layer.self_attn.layer_idx
 
+            # [CLSE] Snapshot reference image features at ref_layers (e.g. layer 2, before
+            # this layer runs) into the shared vtr_ctx, for cross-layer spectral-evolution
+            # scoring. Empty ref_layers (the default) makes this a no-op for other strategies.
+            if should_prune and current_image_range is not None:
+                _ref_layers = getattr(self._vtr_config, "ref_layers", None) or []
+                if layer_idx in _ref_layers:
+                    _rs, _re = current_image_range
+                    vtr_ctx["z_ref"] = hidden_states[:, _rs:_re, :]
+
             # Check if attention is needed at this layer (K-1 layer)
             need_attention_for_pruning = should_prune and layer_idx in prune_layer_set
             layer_output_attentions = output_attentions or need_attention_for_pruning
@@ -390,6 +405,9 @@ class PrunableLlamaModel(LlamaModel):
                     else:
                         raise ValueError("Attention weights are None but pruning is requested.")
 
+                # [CLSE] expose the current layer index (K-1) so stage-aware strategies can
+                # determine which progressive pruning stage they are in.
+                vtr_ctx["layer_idx"] = layer_idx
                 # Execute full pruning (past_key_values already contains K-1 layer's kv)
                 hidden_states, position_ids, attention_mask, past_key_values, new_seq_len, new_image_range = \
                     self._compute_and_apply_pruning(
@@ -474,6 +492,11 @@ class PrunableLlamaModel(LlamaModel):
         # If no image tokens, return as-is
         if num_img_tokens <= 0:
             return hidden_states, position_ids, attention_mask, past_key_values, seq_length, image_token_range
+
+        # [CLSE] route the current-layer image features z_Lk in through vtr_ctx so the
+        # spectral-evolution score can compare them with the z_ref snapshot. Other
+        # strategies simply ignore this key.
+        vtr_ctx["hidden_states"] = hidden_states
 
         # Step 1: Compute scores
         scores = self._vtr_strategy.compute_scores(

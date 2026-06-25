@@ -103,13 +103,14 @@ results, and ablations.
 | InternVL2.5 | [`image/InternVL/`](image/InternVL/) | `PriorTRinternvl` | `≤4.49.0` | PriorTR, FastV |
 | Qwen2-VL | [`image/Qwen2-VL/`](image/Qwen2-VL/) | `PriorTRqwen2vl` | `4.57.x` (stock) | PriorTR, FastV, CLSE |
 | Qwen3-VL | [`image/Qwen3-VL/`](image/Qwen3-VL/) | `PriorTRqwen3vl` | `5.2.0.dev0` (pinned commit) | PriorTR, PriorTR-2F, FastV, SparseVLM, VisPruner, CLSE |
-| Video-LLaVA | [`video/Video-LLaVA/`](video/Video-LLaVA/) | `PriorTRvideollava` | `4.37.2` | PriorTR-2F, FastV |
+| Video-LLaVA | [`video/Video-LLaVA/`](video/Video-LLaVA/) | `PriorTRvideollava` | `4.37.2` | PriorTR-2F, FastV, CLSE |
 
 Each subproject pins a **mutually-incompatible** `transformers` version, so every model lives in its
 **own conda env** — they cannot coexist in one Python process. **PriorTR-2F** is the two-forward variant
 of PriorTR (an explicit prior forward instead of the single-forward causal-mask shortcut); Video-LLaVA
 has no single-forward PriorTR because video lacks that shortcut. **CLSE** (Cross-Layer Spectral
-Evolution) is an integrated drop-in strategy on the three image backbones — see [docs/CLSE.md](docs/CLSE.md).
+Evolution) is an integrated drop-in strategy across all four backbones — three-stage on the image
+models, single-stage on Video-LLaVA — see [docs/CLSE.md](docs/CLSE.md).
 
 ## ⚙️ Installation
 
@@ -173,7 +174,7 @@ PriorTR/
 ├── assets/                        # README figures (framework / intro / spider)
 ├── docs/
 │   ├── RUNNER.md                  #   launcher reference: flags, capability matrix, --param
-│   ├── CLSE.md                    #   Cross-Layer Spectral Evolution pruning (LLaVA · Qwen2-VL · Qwen3-VL)
+│   ├── CLSE.md                    #   Cross-Layer Spectral Evolution pruning (LLaVA · Qwen2-VL · Qwen3-VL · Video-LLaVA)
 │   └── adding-a-method.md         #   recipe for plugging in a new pruning strategy
 ├── image/
 │   ├── LLaVA/                     # PriorTR on LLaVA-1.5      (transformers 4.37.2)
@@ -188,8 +189,8 @@ PriorTR/
 │   └── Qwen3-VL/                  # PriorTR + method zoo      (pinned transformers commit)
 │       └── visual_token_pruning/  #   └ priortr · priortr_2f · fastv · sparsevlm · vispruner · clse
 ├── video/
-│   └── Video-LLaVA/               # PriorTR-2F on Video-LLaVA (video)
-│       └── videollava/vtr/        #   └ VTR framework (video)
+│   └── Video-LLaVA/               # PriorTR-2F + FastV + CLSE on Video-LLaVA (video)
+│       └── videollava/vtr/        #   └ VTR framework (video): priortr_2f · fastv · clse
 └── LICENSE
 ```
 

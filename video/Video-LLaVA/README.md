@@ -1,14 +1,14 @@
 <div align="center">
 <h2>PriorTR-2F on Video-LLaVA</h2>
-<p><b>Two-forward V-Information visual token pruning for video.</b> A <b>prior forward</b> (empty prompt) then a <b>task forward</b> (the real question); score by <code>S = P · log(P / Q)</code> and keep the tokens carrying task-specific information beyond the prior. Video lacks the single-forward causal-mask shortcut, hence two forwards.</p>
+<p><b>Two-forward V-Information visual token pruning for video.</b> A <b>prior forward</b> (empty prompt) then a <b>task forward</b> (the real question); score by <code>S = P · log(P / Q)</code> and keep the tokens carrying task-specific information beyond the prior. Video lacks the single-forward causal-mask shortcut, hence two forwards. Also ships FastV and <a href="../../docs/CLSE.md">CLSE</a> (single-stage spectral-evolution pruning).</p>
 <p>
   <img src="https://img.shields.io/badge/conda-PriorTRvideollava-44A833?logo=anaconda&logoColor=white" alt="env">
   <img src="https://img.shields.io/badge/transformers-4.37.2-FFD21E?logo=huggingface&logoColor=black" alt="transformers">
-  <img src="https://img.shields.io/badge/methods-PriorTR--2F%20%7C%20FastV-3776AB" alt="methods">
+  <img src="https://img.shields.io/badge/methods-PriorTR--2F%20%C2%B7%20FastV%20%C2%B7%20CLSE-3776AB" alt="methods">
 </p>
 </div>
 
-> 🧩 Part of [**PriorTR**](../../README.md) · [unified runner](../../docs/RUNNER.md) · [add a method](../../docs/adding-a-method.md)
+> 🧩 Part of [**PriorTR**](../../README.md) · [unified runner](../../docs/RUNNER.md) · [add a method](../../docs/adding-a-method.md) · [CLSE pruning](../../docs/CLSE.md)
 
 ## ⚙️ Environment Setup
 
@@ -72,7 +72,7 @@ PY
 python -c "
 import torch, transformers; print(torch.__version__, transformers.__version__)
 from videollava.vtr.config import VTRConfig, PriorTR2FConfig
-from videollava.vtr.strategy import PriorTR2FStrategy, FastVStrategy
+from videollava.vtr.strategy import PriorTR2FStrategy, FastVStrategy, CLSEStrategy
 print('VTR OK')
 "
 ```
@@ -105,6 +105,13 @@ python $S --model_path $M --cache_dir ./cache \
     --video_dir $DATA/videos --gt_file_question $DATA/test_q.json --gt_file_answers $DATA/test_a.json \
     --output_dir output/msvd_fastv_k64 --output_name pred \
     --vtr_enabled --vtr_strategy fastv --vtr_prune_layer 3 --vtr_keep_tokens 64
+
+# CLSE (Cross-Layer Spectral Evolution, single-stage) — one budget knob; see docs/CLSE.md
+# prune_layer=[3] and ref_layers=[2] auto-resolve from --vtr_strategy clse alone.
+python $S --model_path $M --cache_dir ./cache \
+    --video_dir $DATA/videos --gt_file_question $DATA/test_q.json --gt_file_answers $DATA/test_a.json \
+    --output_dir output/msvd_clse_k64 --output_name pred \
+    --vtr_enabled --vtr_strategy clse --vtr_keep_tokens 64
 ```
 
 ## 📊 GPT Evaluation
@@ -127,15 +134,18 @@ Reports accuracy and average score (0–5) against the ground truth.
 | Parameter | CLI Flag | Default | Description |
 |---|---|:---:|---|
 | enabled | `--vtr_enabled` | `False` | Enable visual token reduction |
-| strategy | `--vtr_strategy` | `priortr_2f` | `priortr_2f` or `fastv` |
-| prune_layer | `--vtr_prune_layer` | `3` | LLM layer index at which to prune |
-| keep_tokens | `--vtr_keep_tokens` | `194` | Number of visual tokens to keep |
+| strategy | `--vtr_strategy` | `priortr_2f` | `priortr_2f`, `fastv`, or `clse` |
+| prune_layer | `--vtr_prune_layer` | `3` | LLM layer index at which to prune (CLSE: snapshot layer is `prune_layer-1`) |
+| keep_tokens | `--vtr_keep_tokens` | `194` | Number of visual tokens to keep (of 2048) |
 | keep_ratio | *(config only)* | `0.25` | Fraction to keep (ignored when keep_tokens is set) |
 | query_aggregation | `--vtr_query_aggregation` | `question` | `question` (all question tokens) or `last` (last token) |
 | head_aggregation | `--vtr_head_aggregation` | `mean` | Aggregate across heads: `mean` or `max` |
 | prior_prompt | *(config only)* | `""` | Prompt for the prior forward (PriorTR-2F only) |
 | score_threshold | *(config only)* | `None` | Keep tokens above this V-Info score (PriorTR-2F only) |
 | adaptive_layer | *(config only)* | `False` | Adaptive layer selection across candidates (PriorTR-2F only) |
+| ref_layers | `--vtr_ref_layers` | `[prune_layer-1]` | CLSE spectral-snapshot layer(s), i.e. `[2]` (CLSE only) |
+| clse_cutoff_ratio | `--vtr_clse_cutoff_ratio` | `0.1` | CLSE 2D-FFT high-pass cutoff (CLSE only) |
+| clse_temp | `--vtr_clse_temp` | `0.1` | CLSE evolution-factor sigmoid temperature (CLSE only) |
 
 ## 📄 License
 
