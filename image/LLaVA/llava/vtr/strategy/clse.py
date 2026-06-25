@@ -66,7 +66,8 @@ def _get_evolution_factor(s_L: torch.Tensor, s_Lk: torch.Tensor,
 def _calculate_evolution_score(z_L: torch.Tensor, z_Lk: torch.Tensor,
                                attn_score: torch.Tensor,
                                grid_hw: Optional[Tuple[int, int]],
-                               cutoff_ratio: float, score_type: str) -> torch.Tensor:
+                               cutoff_ratio: float, score_type: str,
+                               temp: float = 0.1) -> torch.Tensor:
     """Combine spectral evolution with attention. Falls back to attention-only when
     the spatial grid is unavailable (i.e. after the first pruning stage)."""
     if score_type == "attn" or grid_hw is None:
@@ -74,7 +75,7 @@ def _calculate_evolution_score(z_L: torch.Tensor, z_Lk: torch.Tensor,
     h, w = grid_hw
     s_L = _spatial_spectral_score_2d(z_L, h, w, cutoff_ratio)
     s_Lk = _spatial_spectral_score_2d(z_Lk, h, w, cutoff_ratio)
-    evo = _get_evolution_factor(s_L, s_Lk)
+    evo = _get_evolution_factor(s_L, s_Lk, temp)
     if score_type == "clse_attn":
         return evo * attn_score
     if score_type == "clse":
@@ -84,6 +85,11 @@ def _calculate_evolution_score(z_L: torch.Tensor, z_Lk: torch.Tensor,
 
 # Nominal layer-averaged budget -> per-stage keep counts (matches CLSE LLaVA `token_dict`).
 _TOKEN_DICT = {192: [330, 210, 62], 128: [220, 140, 41], 64: [110, 70, 20]}
+
+# Cross-model symmetry: a nominal retain_ratio (0.334 / 0.223 / 0.112) selects the
+# matching keep_tokens preset, so the same single knob works here as on the Qwen
+# backbones (192≈1/3, 128≈2/9, 64≈1/9 of the 576-token grid).
+_RATIO_TO_TOKENS = {0.334: 192, 0.223: 128, 0.112: 64}
 
 
 @register_strategy("clse")
@@ -110,6 +116,11 @@ class CLSEStrategy(PruningStrategy):
     @staticmethod
     def _schedule(config: "VTRConfig") -> list:
         n = config.keep_tokens
+        if n is None:
+            # Cross-model alias: a nominal retain_ratio selects the keep_tokens preset.
+            r = getattr(config, "retain_ratio", None)
+            if r is not None:
+                n = _RATIO_TO_TOKENS.get(round(float(r), 3), int(round(r * 576)))
         if n in _TOKEN_DICT:
             return _TOKEN_DICT[n]
         # Fallback for arbitrary budgets (same 3-stage ratios as the CLSE reference).
@@ -135,9 +146,11 @@ class CLSEStrategy(PruningStrategy):
         if stage == 0 and ("z_ref" in ctx) and ("hidden_states" in ctx):
             z_L = ctx["z_ref"]                                      # [B, 576, C]
             z_Lk = ctx["hidden_states"][:, img_start:img_end, :]    # [B, 576, C]
+            cutoff = float(getattr(config, "clse_cutoff_ratio", self.CUTOFF_RATIO))
+            temp = float(getattr(config, "clse_temp", 0.1))
             score = _calculate_evolution_score(
                 z_L, z_Lk, attn_score,
-                (self.GRID_H, self.GRID_W), self.CUTOFF_RATIO, self.SCORE_TYPE,
+                (self.GRID_H, self.GRID_W), cutoff, self.SCORE_TYPE, temp,
             )
         else:
             score = attn_score

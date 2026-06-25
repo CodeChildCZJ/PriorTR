@@ -73,11 +73,12 @@ def _get_evolution_factor(s_L: torch.Tensor, s_Lk: torch.Tensor,
 
 def _calculate_evolution_score(z_L: torch.Tensor, z_Lk: torch.Tensor,
                                attn_score: torch.Tensor, grid_hw: Tuple[int, int],
-                               cutoff_ratio: float, score_type: str) -> torch.Tensor:
+                               cutoff_ratio: float, score_type: str,
+                               temp: float = 0.1) -> torch.Tensor:
     h, w = grid_hw
     s_L = _spatial_spectral_score_2d(z_L, h, w, cutoff_ratio)
     s_Lk = _spatial_spectral_score_2d(z_Lk, h, w, cutoff_ratio)
-    evo = _get_evolution_factor(s_L, s_Lk)
+    evo = _get_evolution_factor(s_L, s_Lk, temp)
     if score_type == "clse_attn":
         return evo * attn_score
     if score_type == "clse":
@@ -95,6 +96,11 @@ _RATIO_DICT = {
     0.223: [0.38, 0.24, 0.066],
     0.112: [0.19, 0.12, 0.034],
 }
+
+# Cross-model symmetry: the LLaVA-style headline budgets (``keep_tokens`` 192/128/64)
+# map to the matching ``retain_ratio`` preset, so either knob selects the same schedule
+# on any backbone (192≈1/3, 128≈2/9, 64≈1/9 of LLaVA's 576-token grid).
+_TOKENS_TO_RATIO = {192: 0.334, 128: 0.223, 64: 0.112}
 
 
 class CLSEStrategy(VTRStrategy):
@@ -120,8 +126,16 @@ class CLSEStrategy(VTRStrategy):
 
     @staticmethod
     def _schedule(config: VTRConfig):
-        """Per-stage keep ratios (of original length) for this retain_ratio, or None."""
+        """Per-stage keep ratios (of original length) for this budget, or None.
+
+        Driven by ``retain_ratio``; a scalar ``keep_tokens`` of 192/128/64 is accepted
+        as a cross-model alias for the matching preset (symmetry with LLaVA).
+        """
         r = getattr(config, "retain_ratio", None)
+        if r is None:
+            kt = getattr(config, "keep_tokens", None)
+            if isinstance(kt, int) and not isinstance(kt, bool) and kt in _TOKENS_TO_RATIO:
+                r = _TOKENS_TO_RATIO[kt]
         if r is None:
             return None
         sched = _RATIO_DICT.get(round(float(r), 3))
@@ -172,8 +186,11 @@ class CLSEStrategy(VTRStrategy):
             z_Lk = hs[:, img_start:img_end, :]
             num_grid = grid[0] * grid[1]
             if z_ref.shape[1] == num_grid and z_Lk.shape[1] == num_grid:
+                # Spectral hyper-parameters are configurable (default to the CLSE values).
+                cutoff = float(getattr(config, "clse_cutoff_ratio", self.CUTOFF_RATIO))
+                temp = float(getattr(config, "clse_temp", 0.1))
                 score = _calculate_evolution_score(
-                    z_ref, z_Lk, attn_score, grid, self.CUTOFF_RATIO, self.SCORE_TYPE,
+                    z_ref, z_Lk, attn_score, grid, cutoff, self.SCORE_TYPE, temp,
                 )
             else:
                 # Grid mismatch (e.g. multi-image input): fall back to attention-only.

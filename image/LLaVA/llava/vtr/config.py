@@ -44,6 +44,15 @@ class VTRConfig:
     # strategies are unaffected).
     ref_layers: List[int] = field(default_factory=list)
 
+    # [CLSE] convenience: a nominal retain_ratio (0.334 / 0.223 / 0.112) selects the
+    # matching keep_tokens preset (192 / 128 / 64), so the same single knob works here
+    # as on the Qwen backbones (cross-model symmetry).
+    retain_ratio: Optional[float] = None
+    # [CLSE] spectral hyper-parameters (defaults match the published method): the 2D-FFT
+    # high-pass cutoff and the evolution-factor sigmoid temperature.
+    clse_cutoff_ratio: float = 0.1
+    clse_temp: float = 0.1
+
     def __post_init__(self) -> None:
         """Validate configuration parameters."""
         # Convert single prune_layer to list for unified handling
@@ -98,6 +107,9 @@ class VTRConfig:
             "query_aggregation": self.query_aggregation,
             "head_aggregation": self.head_aggregation,
             "ref_layers": self.ref_layers,
+            "retain_ratio": self.retain_ratio,
+            "clse_cutoff_ratio": self.clse_cutoff_ratio,
+            "clse_temp": self.clse_temp,
         }
 
     @classmethod

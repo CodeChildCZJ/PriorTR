@@ -54,6 +54,8 @@ class Qwen2_VL_VTR(Qwen2_VL):
         vtr_keep_ratio: Union[str, float] = "0.5",
         vtr_keep_tokens: Optional[str] = None,
         vtr_retain_ratio: Optional[Union[str, float]] = None,
+        vtr_clse_cutoff_ratio: Optional[Union[str, float]] = None,
+        vtr_clse_temp: Optional[Union[str, float]] = None,
         vtr_prune_layer: Union[str, int] = "3",
         vtr_query_aggregation: str = "auto",
         vtr_head_aggregation: str = "mean",
@@ -87,6 +89,10 @@ class Qwen2_VL_VTR(Qwen2_VL):
             # CLSE convenience knob: one nominal retain ratio (0.334 / 0.223 / 0.112)
             # activates the hard-coded per-stage schedule (see strategy/clse.py).
             config_kwargs["retain_ratio"] = float(vtr_retain_ratio)
+        if vtr_clse_cutoff_ratio is not None:
+            config_kwargs["clse_cutoff_ratio"] = float(vtr_clse_cutoff_ratio)
+        if vtr_clse_temp is not None:
+            config_kwargs["clse_temp"] = float(vtr_clse_temp)
         self._vtr_config = VTRConfig(**config_kwargs)
 
         # Call grandparent (lmms) init to avoid Qwen2_VL loading the stock model.

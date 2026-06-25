@@ -80,6 +80,12 @@ class VTRConfig:
     # original visual length. See visual_token_pruning/strategy/clse.py.
     retain_ratio: Optional[float] = None
 
+    # CLSE spectral hyper-parameters (defaults match the published method). Exposed so
+    # the 2D-FFT high-pass cutoff and the evolution-factor sigmoid temperature are tunable
+    # without editing the strategy.
+    clse_cutoff_ratio: float = 0.1
+    clse_temp: float = 0.1
+
     # Token merge (SparseVLM)
     token_merge: bool = False
     merge_clusters: Union[int, List[int]] = 10

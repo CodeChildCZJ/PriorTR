@@ -202,14 +202,23 @@ the original CLSE-Qwen2-VL per-stage budget). *Arbitrary `r` → fallback `[r·1
 If `retain_ratio` / `keep_tokens` is **unset**, CLSE falls back to the framework's generic
 `keep_ratio` (ratio-of-current) — for power users who want to pass per-stage ratios directly.
 
-### 2. Spectral-scoring constants (fixed in the strategy)
+**Cross-model symmetry.** Both knobs work on every backbone and select the same preset:
+`retain_ratio=0.334 ≡ keep_tokens=192`, `0.223 ≡ 128`, `0.112 ≡ 64`. Use whichever you remember —
+the LLaVA-style token budget or the Qwen-style ratio — on any model. (A list-valued `keep_tokens`,
+e.g. `145;92;25`, is taken literally as explicit per-stage counts, not as a preset.)
 
-| Constant | Value | Role |
+### 2. Spectral-scoring constants
+
+**Configurable** (defaults match the published method) via `clse_cutoff_ratio` / `clse_temp`
+(`vtr_clse_cutoff_ratio` / `vtr_clse_temp` on the Qwen wrappers):
+
+| Knob | Default | Role |
 |---|:---:|---|
-| `CUTOFF_RATIO` | `0.1` | 2D-FFT high-pass cutoff (Gaussian `1 − exp(−d²/2σ²)`, `σ = min(cH,cW)·cutoff`) |
-| `temp` | `0.1` | sigmoid temperature in the evolution factor |
-| `epsilon` | `1e-6` | divide-by-zero guards (two places) |
-| `clamp(evo, max=1)` | — | upper bound on the per-token evolution rate |
+| `clse_cutoff_ratio` | `0.1` | 2D-FFT high-pass cutoff (Gaussian `1 − exp(−d²/2σ²)`, `σ = min(cH,cW)·cutoff`) |
+| `clse_temp` | `0.1` | sigmoid temperature in the evolution factor |
+
+**Fixed in the strategy:** `epsilon = 1e-6` (divide-by-zero guards) and `clamp(evo, max=1)` (upper
+bound on the per-token evolution rate).
 
 ### 3. Structural choices (fixed in the strategy)
 
@@ -220,9 +229,9 @@ If `retain_ratio` / `keep_tokens` is **unset**, CLSE falls back to the framework
   because pruning breaks the 2D grid the FFT needs.
 - Grid: LLaVA fixed **24×24**; Qwen derived from `image_grid_thw` (`H//2, W//2` after the 2×2 merge).
 
-These are not exposed as config today. If you need to tune the spectral aggressiveness
-(`CUTOFF_RATIO`) or evolution sensitivity (`temp`), edit them in the strategy file
-(`.../strategy/clse.py`).
+These structural choices are fixed in the strategy file (`.../strategy/clse.py`); edit there to
+change them. The two numeric spectral hyper-parameters (`clse_cutoff_ratio`, `clse_temp`) are
+exposed as config — see section 2.
 
 ## ✅ Reference numbers (full MME)
 
