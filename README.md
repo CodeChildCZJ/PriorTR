@@ -68,7 +68,7 @@ tokens are **physically retained** so every subsequent layer operates on a short
 - 🔥 **A hidden prior in attention.** We identify that attention-based ranking is dominated by a *model-induced prior* that buries instruction-relevant tokens.
 - 🔥 **Prior correction in a single forward.** A null token probes the prior `Q` and the posterior `P` in the *same* attention block — avoiding the duplicated propagation that two-pass methods need.
 - 🔥 **V-Information scoring.** Tokens are ranked by `S = P · log(P / Q)`, the additional task-usable information each token carries, rather than by raw attention magnitude.
-- 🔥 **Image *and* video, 4 backbones.** One unified implementation across LLaVA-1.5, InternVL2.5, Qwen3-VL (image) and Video-LLaVA (video), behind a single CLI.
+- 🔥 **Image *and* video, 5 backbones.** One unified implementation across LLaVA-1.5, InternVL2.5, Qwen2-VL, Qwen3-VL (image) and Video-LLaVA (video), behind a single CLI.
 - 🔥 **State-of-the-art trade-off.** Keeps **~99.5%** of full performance at **1/3** the tokens and **94.5%** at **1/9**, beating strong training-free baselines — the gap widens under aggressive budgets.
 
 ## 📊 Results
@@ -99,15 +99,17 @@ results, and ablations.
 
 | Model | Path | Conda Env | `transformers` | Strategies |
 |---|---|---|---|---|
-| LLaVA-1.5 | [`image/LLaVA/`](image/LLaVA/) | `PriorTRllava` | `4.37.2` | PriorTR |
+| LLaVA-1.5 | [`image/LLaVA/`](image/LLaVA/) | `PriorTRllava` | `4.37.2` | PriorTR, CLSE |
 | InternVL2.5 | [`image/InternVL/`](image/InternVL/) | `PriorTRinternvl` | `≤4.49.0` | PriorTR, FastV |
-| Qwen3-VL | [`image/Qwen3-VL/`](image/Qwen3-VL/) | `PriorTRqwen3vl` | `5.2.0.dev0` (pinned commit) | PriorTR, PriorTR-2F, FastV, SparseVLM, VisPruner |
+| Qwen2-VL | [`image/Qwen2-VL/`](image/Qwen2-VL/) | `PriorTRqwen2vl` | `4.57.x` (stock) | PriorTR, FastV, CLSE |
+| Qwen3-VL | [`image/Qwen3-VL/`](image/Qwen3-VL/) | `PriorTRqwen3vl` | `5.2.0.dev0` (pinned commit) | PriorTR, PriorTR-2F, FastV, SparseVLM, VisPruner, CLSE |
 | Video-LLaVA | [`video/Video-LLaVA/`](video/Video-LLaVA/) | `PriorTRvideollava` | `4.37.2` | PriorTR-2F, FastV |
 
 Each subproject pins a **mutually-incompatible** `transformers` version, so every model lives in its
 **own conda env** — they cannot coexist in one Python process. **PriorTR-2F** is the two-forward variant
 of PriorTR (an explicit prior forward instead of the single-forward causal-mask shortcut); Video-LLaVA
-has no single-forward PriorTR because video lacks that shortcut.
+has no single-forward PriorTR because video lacks that shortcut. **CLSE** (Cross-Layer Spectral
+Evolution) is an integrated drop-in strategy on the three image backbones — see [docs/CLSE.md](docs/CLSE.md).
 
 ## ⚙️ Installation
 
@@ -120,7 +122,7 @@ conda create -n PriorTR<model> python=3.10 -y          # name must match the tab
 conda activate PriorTR<model>
 pip install torch torchvision --index-url .../cu128     # cu128 for Blackwell/SM_120, else cu121
 pip install <pinned transformers>                       # per model: see the table / subproject README
-pip install -e .                                        # Qwen3-VL uses `python setup.py develop` (creates a symlink)
+pip install -e .                                        # Qwen3-VL uses `python setup.py develop`; Qwen2-VL needs no install (run via PYTHONPATH)
 ```
 
 The **image** models also evaluate through [lmms-eval](https://github.com/EvolvingLMMs-Lab/lmms-eval)
@@ -128,7 +130,7 @@ The **image** models also evaluate through [lmms-eval](https://github.com/Evolvi
 wrapper) — see the per-model README. **Video-LLaVA** ships its own inference scripts and does not use
 lmms-eval. Weights and benchmark data download from HuggingFace on first run.
 
-→ Per-model setup: [LLaVA](image/LLaVA/README.md) · [InternVL](image/InternVL/README.md) · [Qwen3-VL](image/Qwen3-VL/README.md) · [Video-LLaVA](video/Video-LLaVA/README.md)
+→ Per-model setup: [LLaVA](image/LLaVA/README.md) · [InternVL](image/InternVL/README.md) · [Qwen2-VL](image/Qwen2-VL/README.md) · [Qwen3-VL](image/Qwen3-VL/README.md) · [Video-LLaVA](video/Video-LLaVA/README.md)
 
 > **Reproducibility:** each image subproject ships a locked `environment.yml` (`conda env export`). It
 > pins every transitive version but is a **record, not a one-command rebuild** — `torch` (cu128 index),
@@ -171,6 +173,7 @@ PriorTR/
 ├── assets/                        # README figures (framework / intro / spider)
 ├── docs/
 │   ├── RUNNER.md                  #   launcher reference: flags, capability matrix, --param
+│   ├── CLSE.md                    #   Cross-Layer Spectral Evolution pruning (LLaVA · Qwen2-VL · Qwen3-VL)
 │   └── adding-a-method.md         #   recipe for plugging in a new pruning strategy
 ├── image/
 │   ├── LLaVA/                     # PriorTR on LLaVA-1.5      (transformers 4.37.2)
@@ -180,8 +183,10 @@ PriorTR/
 │   │       └── config.py          #       VTRConfig (keep_tokens / prune_layer / …)
 │   ├── InternVL/                  # PriorTR on InternVL2.5    (transformers ≤4.49)
 │   │   └── internvl_vtr/          #   └ same strategy-pattern framework
+│   ├── Qwen2-VL/                  # PriorTR + FastV + CLSE    (stock transformers 4.57)
+│   │   └── visual_token_pruning/  #   └ priortr · fastv · clse
 │   └── Qwen3-VL/                  # PriorTR + method zoo      (pinned transformers commit)
-│       └── visual_token_pruning/  #   └ priortr · priortr_2f · fastv · sparsevlm · vispruner
+│       └── visual_token_pruning/  #   └ priortr · priortr_2f · fastv · sparsevlm · vispruner · clse
 ├── video/
 │   └── Video-LLaVA/               # PriorTR-2F on Video-LLaVA (video)
 │       └── videollava/vtr/        #   └ VTR framework (video)
@@ -189,7 +194,7 @@ PriorTR/
 ```
 
 Each model ships its **own** copy of the VTR framework — incompatible `transformers` pins keep them
-isolated — but the strategy pattern is identical across all four. To add a method, implement one
+isolated — but the strategy pattern is identical across all five. To add a method, implement one
 `compute_scores` class and register it; see [`docs/adding-a-method.md`](docs/adding-a-method.md).
 
 ## 📜 Citation

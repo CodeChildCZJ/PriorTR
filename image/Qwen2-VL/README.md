@@ -2,7 +2,7 @@
 <h2>PriorTR on Qwen2-VL</h2>
 <p><b>Single-forward V-Information visual token pruning.</b> Estimate the prior <code>Q</code> and posterior <code>P</code> in one forward, score by <code>S = P · log(P / Q)</code>, keep Top-K — plus FastV and the native home of <a href="../../docs/CLSE.md">CLSE</a>. Self-contained: runs on <b>stock</b> <code>pip install transformers</code>, no library patch.</p>
 <p>
-  <img src="https://img.shields.io/badge/conda-priortr--qwen2vl-44A833?logo=anaconda&logoColor=white" alt="env">
+  <img src="https://img.shields.io/badge/conda-PriorTRqwen2vl-44A833?logo=anaconda&logoColor=white" alt="env">
   <img src="https://img.shields.io/badge/transformers-4.57.x-FFD21E?logo=huggingface&logoColor=black" alt="transformers">
   <img src="https://img.shields.io/badge/methods-PriorTR%20%C2%B7%20FastV%20%C2%B7%20CLSE-3776AB" alt="methods">
 </p>
@@ -13,8 +13,8 @@
 ## ⚙️ Environment Setup
 
 ```bash
-conda create -n priortr-qwen2vl python=3.10 -y -c conda-forge --override-channels
-conda activate priortr-qwen2vl
+conda create -n PriorTRqwen2vl python=3.10 -y -c conda-forge --override-channels
+conda activate PriorTRqwen2vl
 
 # 1. PyTorch — cu121 for standard GPUs, cu128 for Blackwell / RTX PRO (SM_120+)
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
