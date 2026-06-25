@@ -80,6 +80,11 @@ class VTRConfig:
     # original visual length. See visual_token_pruning/strategy/clse.py.
     retain_ratio: Optional[float] = None
 
+    # CLSE reference layers: which layer's input is snapshotted as z_ref for the spectral-
+    # evolution term. Empty by default; apply_clse_defaults() sets [0] for strategy='clse'
+    # (the decoder loop snapshots z_ref when layer_idx in ref_layers). Explicit values win.
+    ref_layers: List[int] = field(default_factory=list)
+
     # CLSE spectral hyper-parameters (defaults match the published method). Exposed so
     # the 2D-FFT high-pass cutoff and the evolution-factor sigmoid temperature are tunable
     # without editing the strategy.
