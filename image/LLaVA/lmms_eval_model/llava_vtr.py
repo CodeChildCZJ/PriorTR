@@ -285,11 +285,20 @@ class LlavaVTR(lmms):
                         parsed_args[clean_key] = int(v)
                     elif target_type == float:
                         parsed_args[clean_key] = float(v)
-                    # Handle Optional types
-                    elif "NoneType" in str(target_type) and (v.lower() == 'none' or v == ''):
+                    # Handle Optional types. Modern Python reprs Optional[int] as
+                    # "typing.Optional[int]" (no "NoneType"), so match both forms.
+                    elif (("NoneType" in str(target_type) or "Optional" in str(target_type))
+                          and (v.lower() == 'none' or v == '')):
                             parsed_args[clean_key] = None
                     elif "float" in str(target_type):
                             parsed_args[clean_key] = float(v)
+                    # Handle Optional[int] / Union[int, List[int]] in scalar form
+                    # (a bare number like "192" or "3"; the "[1,2,3]" list form is
+                    # already parsed above). Pure List/Tuple types are excluded so
+                    # they still fall through to the explicit list branch below.
+                    elif ("int" in str(target_type)
+                          and not str(target_type).startswith(("typing.List", "typing.Tuple"))):
+                        parsed_args[clean_key] = int(v)
                     # Handle explicitly defined List types (fallback)
                     elif str(target_type).startswith("typing.List") or str(target_type).startswith("typing.Tuple"):
                         v_clean = v.strip("[]()")

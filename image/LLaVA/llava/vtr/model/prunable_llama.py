@@ -14,7 +14,6 @@ from transformers.models.llama.modeling_llama import (
 )
 from transformers.modeling_outputs import BaseModelOutputWithPast
 from transformers.cache_utils import Cache, DynamicCache
-from transformers.models.llama.modeling_llama import LlamaAttention
 
 if TYPE_CHECKING:
     from ..config import VTRConfig
@@ -494,9 +493,4 @@ class PrunableLlamaModel(LlamaModel):
         logger.debug(f"Pruning: {num_img_tokens} -> {num_kept_img_tokens} image tokens, "
                     f"seq_len: {seq_length} -> {new_seq_len}, "
                     f"image_range: {image_token_range} -> {new_image_range}")
-        # print(f"Pruning: {num_img_tokens} -> {num_kept_img_tokens} image tokens, "
-        #             f"seq_len: {seq_length} -> {new_seq_len}, "
-        #             f"image_range: {image_token_range} -> {new_image_range},"
-        #             f"hidden_states.shape: {hidden_states.shape}",
-        #             f"position_ids.max(): {position_ids.max()}")
         return hidden_states, position_ids, attention_mask, past_key_values, new_seq_len, new_image_range

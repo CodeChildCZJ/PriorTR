@@ -80,9 +80,21 @@ class PriorTRStrategy(PruningStrategy):
             raise ValueError(f"Invalid head aggregation mode: {config.head_aggregation}")
 
         # ---- Normalization & V-Information ----
+        # Upcast to float32 first: in fp16/bf16 the eps below underflows and a
+        # near-zero attention column can drive log((P+eps)/(Q+eps)) to inf/NaN.
+        # The Qwen/Video PriorTR backbones all score in float32; match them here.
+        original_dtype = P.dtype
+        P = P.float()
+        Q = Q.float()
         eps = 1e-10
         P = P / (P.sum() + eps)
         Q = Q / (Q.sum() + eps)
         S = P * torch.log((P + eps) / (Q + eps))
 
-        return S
+        # ---- Numerical stability (guard against any residual inf/NaN) ----
+        if torch.isnan(S).any():
+            S = torch.nan_to_num(S, nan=0.0)
+        if torch.isinf(S).any():
+            S = torch.clamp(S, min=-1e6, max=1e6)
+
+        return S.to(original_dtype)

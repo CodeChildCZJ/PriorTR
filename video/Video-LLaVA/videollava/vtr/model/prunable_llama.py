@@ -22,7 +22,6 @@ if version.parse(transformers.__version__) < version.parse("4.37.0"):
     raise RuntimeError("DynamicCache requires transformers>=4.37.0, please upgrade your environment")
 
 from transformers.cache_utils import Cache, DynamicCache
-from transformers.models.llama.modeling_llama import LlamaAttention
 
 if TYPE_CHECKING:
     from ..config import VTRConfig
